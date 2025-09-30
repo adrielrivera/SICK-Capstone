@@ -5,29 +5,29 @@ import argparse
 import serial
 import pigpio
 
-# ------------- TUNABLES -------------
-SERIAL_PORT = "/dev/ttyACM0"   # e.g., /dev/ttyUSB0 on some boards
+# tune based on ardiddyuno
+SERIAL_PORT = "/dev/ttyACM0"   # ts board is bipolar so it might be /dev/ttyUSB0 
 BAUD        = 115200
 GPIO_PULSE  = 18               # BCM numbering
-SAMPLES_PER_SEC = 800          # depends on your Arduino delay
+SAMPLES_PER_SEC = 800          # depends on the ardiddyuno delay
 
-# Envelope detection
+# envelope detection
 ENVELOPE_ALPHA     = 0.12      # 0<alpha<1; lower = more smoothing
 TRIGGER_THRESHOLD  = 60        # counts above baseline (0–1023 scale)
 CAPTURE_MS         = 250       # how long to hunt for peak after trigger
 REFRACTORY_MS      = 200       # ignore re-triggers after a hit
 
-# Amplitude → pulse width mapping (linear)
-# Calibrate these to taste:
+# amplitude -> pulse width mapping (linear)
+# calibrate these to taste:
 A_MIN      = 80                # counts; small tap baseline
 A_MAX      = 700               # counts; huge slam
 W_MIN_MS   = 60                # ms
 W_MAX_MS   = 1500              # ms
 
-# Optional: decay baseline slowly (helps auto-center)
+# ts optional, decay baseline slowly (helps auto-center)
 BASELINE_ALPHA     = 0.001
 
-# ------------- HELPERS -------------
+# helpers
 def clamp(x, lo, hi):
     return max(lo, min(hi, x))
 
@@ -38,7 +38,7 @@ def map_linear(x, x0, x1, y0, y1):
     return y0 + t * (y1 - y0)
 
 def build_pulse_wave(pi, gpio, width_ms):
-    """Use pigpio waves for accurate pulse."""
+    """use pigpio waves for accurate pulse."""
     pi.write(gpio, 0)
     pi.wave_clear()
 
@@ -49,7 +49,7 @@ def build_pulse_wave(pi, gpio, width_ms):
     wid = pi.wave_create()
     return wid
 
-# ------------- MAIN -------------
+# main
 def main():
     ap = argparse.ArgumentParser(description="PBT amplitude → pulse on Raspberry Pi (serial from Arduino).")
     ap.add_argument("--port", default=SERIAL_PORT)
@@ -68,10 +68,10 @@ def main():
 
     # serial init
     ser = serial.Serial(args.port, args.baud, timeout=1)
-    # Let serial settle
+    # let serial settle
     time.sleep(0.2); ser.reset_input_buffer()
 
-    # State
+    # state
     baseline = 0.0
     env = 0.0
     armed = True
