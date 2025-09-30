@@ -79,7 +79,7 @@ def main():
     cap_end = 0.0
     last_fire = 0.0
 
-    # Quick baseline warm-up (200 ms)
+    # quick baseline warm-up (200 ms)
     t0 = time.time()
     warm_n = 0
     while time.time() - t0 < 0.2:
@@ -95,7 +95,7 @@ def main():
 
     print(f"Baseline ≈ {baseline:.1f} (0–1023 ADC counts)")
 
-    # Loop
+    # loop
     try:
         sample_period = 1.0 / SAMPLES_PER_SEC if SAMPLES_PER_SEC > 0 else 0.0
         next_tick = time.time()
@@ -116,10 +116,10 @@ def main():
             except ValueError:
                 continue
 
-            # Update baseline slowly so it follows drift but ignores hits
+            # update baseline slowly so it follows drift but ignores hits
             baseline = (1.0 - BASELINE_ALPHA) * baseline + BASELINE_ALPHA * raw
 
-            # Full-wave rectify around baseline → envelope IIR
+            # full-wave rectify around baseline -> envelope IIR
             x = abs(raw - baseline)
             env = (1.0 - ENVELOPE_ALPHA) * env + ENVELOPE_ALPHA * x
 
@@ -131,13 +131,13 @@ def main():
                     peak = env
                     cap_end = now + (CAPTURE_MS / 1000.0)
             else:
-                # During capture window track the maximum envelope
+                # during capture window track the maximum envelope
                 if env > peak:
                     peak = env
 
-                # End conditions: time up or envelope dropped a lot
+                # end conditions: time up or envelope dropped a lot
                 if now >= cap_end or env < (TRIGGER_THRESHOLD * 0.5):
-                    # Determine pulse width (linear map with clamp)
+                    # determine pulse width (linear map with clamp)
                     a_clamped = clamp(peak, A_MIN, A_MAX)
                     width_ms = map_linear(a_clamped, A_MIN, A_MAX, W_MIN_MS, W_MAX_MS)
                     width_ms = clamp(width_ms, W_MIN_MS, W_MAX_MS)
@@ -145,7 +145,7 @@ def main():
                     if args.print_peaks:
                         print(f"Peak={peak:.1f} → {width_ms:.0f} ms")
 
-                    # Fire pulse precisely
+                    # fire pulse precisely
                     wid = build_pulse_wave(pi, args.gpio, width_ms)
                     if wid >= 0:
                         pi.wave_send_once(wid)
@@ -153,15 +153,15 @@ def main():
                             time.sleep(0.001)
                         pi.wave_delete(wid)
                     else:
-                        # Fallback (shouldn't happen)
+                        # fallback (pray to God that this doesn't have to happen)
                         pi.write(args.gpio, 1); time.sleep(width_ms/1000.0); pi.write(args.gpio, 0)
 
                     last_fire = now
-                    # Refractory
+                    # refractory
                     time.sleep(REFRACTORY_MS / 1000.0)
                     armed = True
 
-            # Soft pace (depends on Arduino rate)
+            # soft pace (depends on Arduino rate)
             if sample_period:
                 now = time.time()
                 if now < next_tick:
