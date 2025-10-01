@@ -7,27 +7,27 @@ import pigpio
 import matplotlib.pyplot as plt
 from collections import deque
 
-# ----- CONFIG (adjust if needed) -----
-SERIAL_PORT = "/dev/ttyUSB0"   # use your actual port
+# configure ts boy
+SERIAL_PORT = "/dev/ttyUSB0"   # keeps changing for some reason
 BAUD        = 115200
 GPIO_PULSE  = 18
 SAMPLES_PER_SEC = 800
 
-# Envelope / trigger
+# envelope
 ENVELOPE_ALPHA     = 0.12
 TRIGGER_THRESHOLD  = 60
 CAPTURE_MS         = 250
 REFRACTORY_MS      = 200
 BASELINE_ALPHA     = 0.001
 
-# Mapping
+# mapping
 A_MIN, A_MAX       = 80, 700
 W_MIN_MS, W_MAX_MS = 60, 1500
 
-# Plotting
-N_PLOT     = 2000             # ~2.5 s history at 800 SPS
-PLOT_EVERY = 40               # update chart ~20 Hz
-# -------------------------------------
+# plotting
+N_PLOT     = 2000             # 2.5 s history at 800 SPS
+PLOT_EVERY = 40               # update chart 20 Hz
+
 
 def clamp(x, lo, hi): return max(lo, min(hi, x))
 
