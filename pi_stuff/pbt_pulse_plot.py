@@ -110,7 +110,7 @@ def main():
     try:
         plot_tick = 0
         while True:
-            # 1) Drain backlog quickly (so hits don't stretch over seconds)
+            # 1) drain backlog quickly (so hits don't stretch over seconds)
             consumed = 0
             while ser.in_waiting > 0 and consumed < 2000:
                 v = read_one_int(ser)
@@ -134,7 +134,7 @@ def main():
                     if env > peak:
                         peak = env
                     if now >= cap_end or env < (TRIGGER_THRESHOLD * 0.5):
-                        # map & fire pulse
+                        # map and fire pulse
                         a_clamped = clamp(peak, A_MIN, A_MAX)
                         width_ms  = clamp(map_linear(a_clamped, A_MIN, A_MAX, W_MIN_MS, W_MAX_MS),
                                           W_MIN_MS, W_MAX_MS)
