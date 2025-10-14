@@ -40,7 +40,7 @@ def stream_demo(seconds=3):
                     chunk = s.recv(65535)
                     if not chunk: break
                     text = (leftover + chunk).decode("ascii", errors="ignore")
-                    # Print raw; you should see sRA LMDscandata lines
+                    # print raw then i should see sRA LMDscandata lines
                     print(text.strip())
                     leftover = b""
                 except socket.timeout:
