@@ -12,10 +12,10 @@ const unsigned long SAMPLE_US = 1000000UL / SAMPLES_PER_SEC;
 // Averaging for noise reduction
 const int AVG_SAMPLES = 4;
 
-// Expected baseline for SICK sensor (~819 for 4.0V on 5V Arduino)
+// Expected baseline for SICK sensor (~380 for 1.86V on 5V Arduino)
 // Will auto-calibrate, but this is the expected range
-const int EXPECTED_BASELINE_MIN = 750;
-const int EXPECTED_BASELINE_MAX = 900;
+const int EXPECTED_BASELINE_MIN = 350;
+const int EXPECTED_BASELINE_MAX = 450;
 
 // Calibration
 const int CALIBRATION_SAMPLES = 1000;  // ~1.25 seconds
