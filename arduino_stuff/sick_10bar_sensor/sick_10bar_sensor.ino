@@ -6,6 +6,8 @@
 
 const int PBT_PIN = A0;
 const int LED_PIN = 13;
+const int GPIO_PIN6 = 6;  // Arcade motherboard Pin 6 (Press START)
+const int GPIO_PIN5 = 5;  // Arcade motherboard Pin 5 (Press ACTIVE)
 const int SAMPLES_PER_SEC = 800;
 const unsigned long SAMPLE_US = 1000000UL / SAMPLES_PER_SEC;
 
@@ -35,13 +37,23 @@ int activityThreshold = 30;  // ~30 counts above baseline
 unsigned long lastActivityMs = 0;
 const unsigned long LED_ON_MS = 100;
 
+// GPIO command buffer
+String gpioCommand = "";
+bool gpioCommandReady = false;
+
 unsigned long nextSample = 0;
 
 void setup() {
   Serial.begin(115200);
   pinMode(PBT_PIN, INPUT);
   pinMode(LED_PIN, OUTPUT);
+  pinMode(GPIO_PIN6, OUTPUT);
+  pinMode(GPIO_PIN5, OUTPUT);
+  
+  // Set initial GPIO states (idle state)
   digitalWrite(LED_PIN, LOW);
+  digitalWrite(GPIO_PIN6, LOW);   // Pin 6 normally LOW
+  digitalWrite(GPIO_PIN5, HIGH);  // Pin 5 normally HIGH
   
   // Use default 5V reference
   analogReference(DEFAULT);
@@ -50,15 +62,19 @@ void setup() {
   lastStatsMs = millis();
   delay(100);
   
-  Serial.println("# SICK 10 Bar PBT Sensor");
+  Serial.println("# SICK 10 Bar PBT Sensor + GPIO Control");
   Serial.println("# Expected baseline: ~385 ADC counts (1.88V)");
   Serial.println("# Expected peak: ~607 ADC counts (2.96V)");
+  Serial.println("# GPIO: Pin 6 (START), Pin 5 (ACTIVE) - 5V output");
   Serial.println("# CALIBRATING...");
 }
 
 void loop() {
   unsigned long now = micros();
   unsigned long nowMs = millis();
+  
+  // Handle GPIO commands from Pi
+  handleGPIOCommands();
   
   // LED activity indicator
   if (nowMs - lastActivityMs > LED_ON_MS) {
@@ -186,4 +202,57 @@ void loop() {
 // - Diagnostics: Shows raw min/max values every 5s
 //
 // This code is 100% compatible with your existing app_combined.py!
+
+// GPIO Command Handling Functions
+void handleGPIOCommands() {
+  // Read serial commands from Pi
+  while (Serial.available()) {
+    char c = Serial.read();
+    
+    if (c == '\n' || c == '\r') {
+      if (gpioCommand.length() > 0) {
+        processGPIOCommand(gpioCommand);
+        gpioCommand = "";
+      }
+    } else {
+      gpioCommand += c;
+    }
+  }
+}
+
+void processGPIOCommand(String command) {
+  command.trim();
+  
+  if (command == "PIN6_HIGH") {
+    digitalWrite(GPIO_PIN6, HIGH);  // 5V output
+    Serial.println("# GPIO: Pin 6 → HIGH (5V)");
+  } 
+  else if (command == "PIN6_LOW") {
+    digitalWrite(GPIO_PIN6, LOW);   // 0V output
+    Serial.println("# GPIO: Pin 6 → LOW (0V)");
+  } 
+  else if (command == "PIN5_HIGH") {
+    digitalWrite(GPIO_PIN5, HIGH);  // 5V output
+    Serial.println("# GPIO: Pin 5 → HIGH (5V)");
+  } 
+  else if (command == "PIN5_LOW") {
+    digitalWrite(GPIO_PIN5, LOW);   // 0V output
+    Serial.println("# GPIO: Pin 5 → LOW (0V)");
+  }
+  else if (command == "RESET_GPIO") {
+    digitalWrite(GPIO_PIN6, LOW);   // Reset to idle
+    digitalWrite(GPIO_PIN5, HIGH);  // Reset to idle
+    Serial.println("# GPIO: Reset to idle state");
+  }
+  else if (command == "STATUS") {
+    Serial.print("# GPIO STATUS: Pin6=");
+    Serial.print(digitalRead(GPIO_PIN6) ? "HIGH" : "LOW");
+    Serial.print(" Pin5=");
+    Serial.println(digitalRead(GPIO_PIN5) ? "HIGH" : "LOW");
+  }
+  else {
+    Serial.print("# GPIO: Unknown command: ");
+    Serial.println(command);
+  }
+}
 
