@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import socket, time
+import socket, time, math
 
 # --- Kite-shaped field detection system ---
 # No longer using the old single-point detector
@@ -78,24 +78,30 @@ def send(sock, cmd, expect_reply=True, timeout=2.0):
 
 # ---- Kite-shaped detection field parameters ----
 KITE_MAX_ANGLE = 20.0715  # degrees
-KITE_MAX_DISTANCE = 212.932  # cm at max angle
-KITE_CENTER_DISTANCE = 250.0  # cm at 0 degrees
+KITE_MAX_DISTANCE = 212.932  # cm at max angle (shadow distance on floor)
+KITE_CENTER_DISTANCE = 250.0  # cm at 0 degrees (shadow distance on floor)
 HAMMER_MAX_DISTANCE = 100.0  # cm - anything closer is considered hammer
+LIDAR_HEIGHT = 280.0  # cm above arcade base
+LIDAR_DOWN_ANGLE = 41.8  # degrees from vertical
 
 def calculate_kite_safe_distance(angle_deg):
     """
     Calculate the safe distance for a given angle in the kite-shaped field.
-    Returns distance in meters.
+    Returns actual beam distance in meters using 3D geometry.
     """
     # Clamp angle to kite field range
     angle_deg = max(-KITE_MAX_ANGLE, min(KITE_MAX_ANGLE, angle_deg))
     
-    # Linear interpolation between center and edge
+    # Linear interpolation between center and edge for shadow distances
     # At 0°: 250cm, At ±20.0715°: 212.932cm
     ratio = abs(angle_deg) / KITE_MAX_ANGLE
-    safe_distance_cm = KITE_CENTER_DISTANCE - (KITE_CENTER_DISTANCE - KITE_MAX_DISTANCE) * ratio
+    shadow_distance_cm = KITE_CENTER_DISTANCE - (KITE_CENTER_DISTANCE - KITE_MAX_DISTANCE) * ratio
     
-    return safe_distance_cm / 100.0  # Convert cm to meters
+    # Convert shadow distance to actual beam distance using 3D geometry
+    # actual_beam_distance = shadow_distance / sin(41.8°)
+    actual_beam_distance_cm = shadow_distance_cm / math.sin(math.radians(LIDAR_DOWN_ANGLE))
+    
+    return actual_beam_distance_cm / 100.0  # Convert cm to meters
 
 def is_in_kite_field(angle_deg):
     """Check if angle is within the kite detection field."""
@@ -105,12 +111,16 @@ def print_kite_field_info():
     """Print kite field configuration for debugging."""
     print("Kite-shaped detection field:")
     print(f"  Field range: ±{KITE_MAX_ANGLE}°")
-    print(f"  Safe distances:")
+    print(f"  LiDAR height: {LIDAR_HEIGHT}cm, down angle: {LIDAR_DOWN_ANGLE}°")
+    print(f"  Safe distances (actual beam distances):")
     for angle in [0, 10, 15, 20, -10, -15, -20]:
         if abs(angle) <= KITE_MAX_ANGLE:
             safe_dist = calculate_kite_safe_distance(angle)
-            print(f"    {angle:3.0f}°: {safe_dist*100:6.1f}cm")
-    print(f"  Hammer threshold: {HAMMER_MAX_DISTANCE}cm (any distance)")
+            # Calculate shadow distance for reference
+            ratio = abs(angle) / KITE_MAX_ANGLE
+            shadow_dist = KITE_CENTER_DISTANCE - (KITE_CENTER_DISTANCE - KITE_MAX_DISTANCE) * ratio
+            print(f"    {angle:3.0f}°: {safe_dist*100:6.1f}cm beam (shadow: {shadow_dist:6.1f}cm)")
+    print(f"  Hammer threshold: {HAMMER_MAX_DISTANCE}cm actual beam distance")
     print()
 
 # ---- Parser for sSN LMDscandata (ASCII/hex) ----
