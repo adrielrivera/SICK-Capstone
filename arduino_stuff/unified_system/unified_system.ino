@@ -218,7 +218,7 @@ void checkCreditInsertion() {
   lastCreditState = creditState;
 }
 
-void checkPBTMessage() {
+void handleGPIOCommands() {
   // Read serial commands from Pi
   while (Serial.available()) {
     char c = Serial.read();
@@ -232,6 +232,12 @@ void checkPBTMessage() {
       gpioCommand += c;
     }
   }
+}
+
+void checkPBTMessage() {
+  // This function is now handled by handleGPIOCommands()
+  // Keeping for compatibility but redirecting to handleGPIOCommands
+  handleGPIOCommands();
 }
 
 void processGPIOCommand(String command) {
