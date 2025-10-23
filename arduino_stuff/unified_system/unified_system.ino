@@ -50,6 +50,16 @@ const unsigned long LED_ON_MS = 100;
 String gpioCommand = "";
 bool gpioCommandReady = false;
 
+// Function declarations
+void handleGPIOCommands();
+void processGPIOCommand(String command);
+void checkCreditInsertion();
+void checkPBTMessage();
+void updateSafetySystem();
+void checkLidarTrigger();
+void runSiren();
+void printDiagnostics();
+
 void setup() {
   Serial.begin(115200);
   
