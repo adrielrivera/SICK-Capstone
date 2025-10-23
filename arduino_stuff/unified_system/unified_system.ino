@@ -25,6 +25,12 @@ int remainingStrikes = 0;
 bool safetySystemActive = false;
 int lastCreditState = HIGH;
 
+// Credit debouncing
+unsigned long lastCreditTime = 0;
+const unsigned long CREDIT_DEBOUNCE_MS = 300; // 300ms debounce time
+bool creditDebouncing = false;
+unsigned long creditDebounceStart = 0;
+
 // PBT Sensor Variables
 int baselineOffset = 512;
 bool calibrated = false;
@@ -202,19 +208,34 @@ void loop() {
 
 void checkCreditInsertion() {
   int creditState = digitalRead(CREDIT_PIN);
-  if (creditState == LOW && lastCreditState == HIGH) {
-    // Falling edge detected - credit inserted
-    creditCount++;
-    remainingStrikes = (creditCount * 2) - pbtHitCount;
-    safetySystemActive = (remainingStrikes > 0);
-    
-    Serial.print("# CREDIT INSERTED: Total=");
-    Serial.print(creditCount);
-    Serial.print(" Strikes=");
-    Serial.print(remainingStrikes);
-    Serial.print(" Safety=");
-    Serial.println(safetySystemActive ? "ACTIVE" : "INACTIVE");
+  unsigned long currentTime = millis();
+  
+  if (creditState == LOW && lastCreditState == HIGH && !creditDebouncing) {
+    // Start debounce period
+    creditDebouncing = true;
+    creditDebounceStart = currentTime;
   }
+  
+  if (creditDebouncing && (currentTime - creditDebounceStart >= CREDIT_DEBOUNCE_MS)) {
+    // Debounce period complete - check if still LOW
+    if (digitalRead(CREDIT_PIN) == LOW) {
+      // Valid credit insertion (debounced)
+      creditCount++;
+      remainingStrikes = (creditCount * 2) - pbtHitCount;
+      safetySystemActive = (remainingStrikes > 0);
+      
+      Serial.print("# CREDIT INSERTED: Total=");
+      Serial.print(creditCount);
+      Serial.print(" Strikes=");
+      Serial.print(remainingStrikes);
+      Serial.print(" Safety=");
+      Serial.println(safetySystemActive ? "ACTIVE" : "INACTIVE");
+      
+      lastCreditTime = currentTime;
+    }
+    creditDebouncing = false;
+  }
+  
   lastCreditState = creditState;
 }
 
