@@ -213,6 +213,19 @@ def send_arduino_trigger():
         except Exception as e:
             print(f"  Error sending LiDAR trigger to Arduino: {e}")
 
+
+def read_arduino_messages():
+    """Read and display Arduino status messages."""
+    global arduino_ser
+    if arduino_ser and not arduino_ser.closed:
+        try:
+            while arduino_ser.in_waiting > 0:
+                line = arduino_ser.readline().decode(errors="ignore").strip()
+                if line and line.startswith("#"):
+                    print(f"  Arduino: {line}")
+        except Exception as e:
+            pass  # Ignore serial read errors
+
 def main():
     # Initialize kite field detection system
     print("=" * 60)
@@ -240,6 +253,7 @@ def main():
     last_state = None
     last_raw_print = 0
     last_print = 0
+    last_status_request = 0
     s.settimeout(1.0)
 
     try:
@@ -264,6 +278,19 @@ def main():
                     # get time first (so it's defined everywhere below)
                     now_ms = int(time.time() * 1000)
 
+                    # Read Arduino messages (credit tracking, status updates)
+                    read_arduino_messages()
+                    
+                    # Request Arduino status every 5 seconds
+                    if now_ms - last_status_request >= 5000:
+                        if arduino_ser and not arduino_ser.closed:
+                            try:
+                                arduino_ser.write(b"STATUS\n")
+                                arduino_ser.flush()
+                                last_status_request = now_ms
+                            except Exception as e:
+                                pass
+                    
                     # Analyze kite field for safety violations
                     out = analyze_kite_field(pts)
                     
