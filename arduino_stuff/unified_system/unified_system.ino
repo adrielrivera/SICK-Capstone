@@ -207,36 +207,42 @@ void loop() {
 }
 
 void checkCreditInsertion() {
-  int creditState = digitalRead(CREDIT_PIN);
-  unsigned long currentTime = millis();
+  static unsigned long lastDebounceTime = 0;
+  static int lastStableState = HIGH;
+  int currentState = digitalRead(CREDIT_PIN);
   
-  if (creditState == LOW && lastCreditState == HIGH && !creditDebouncing) {
-    // Start debounce period
-    creditDebouncing = true;
-    creditDebounceStart = currentTime;
+  // If the state has changed, reset the debounce timer
+  if (currentState != lastStableState) {
+    lastDebounceTime = millis();
+    // Debug: Show state change
+    Serial.print("# Credit pin state changed to: ");
+    Serial.println(currentState == HIGH ? "HIGH" : "LOW");
   }
   
-  if (creditDebouncing && (currentTime - creditDebounceStart >= CREDIT_DEBOUNCE_MS)) {
-    // Debounce period complete - check if still LOW
-    if (digitalRead(CREDIT_PIN) == LOW) {
-      // Valid credit insertion (debounced)
-      creditCount++;
-      remainingStrikes = (creditCount * 2) - pbtHitCount;
-      safetySystemActive = (remainingStrikes > 0);
+  // If enough time has passed since the last state change
+  if ((millis() - lastDebounceTime) > CREDIT_DEBOUNCE_MS) {
+    // If the current state is different from the last recorded state
+    if (currentState != lastCreditState) {
+      lastCreditState = currentState;
       
-      Serial.print("# CREDIT INSERTED: Total=");
-      Serial.print(creditCount);
-      Serial.print(" Strikes=");
-      Serial.print(remainingStrikes);
-      Serial.print(" Safety=");
-      Serial.println(safetySystemActive ? "ACTIVE" : "INACTIVE");
-      
-      lastCreditTime = currentTime;
+      // Only register credit on falling edge (HIGH to LOW)
+      if (currentState == LOW) {
+        // Valid credit insertion (debounced)
+        creditCount++;
+        remainingStrikes = (creditCount * 2) - pbtHitCount;
+        safetySystemActive = (remainingStrikes > 0);
+        
+        Serial.print("# CREDIT INSERTED: Total=");
+        Serial.print(creditCount);
+        Serial.print(" Strikes=");
+        Serial.print(remainingStrikes);
+        Serial.print(" Safety=");
+        Serial.println(safetySystemActive ? "ACTIVE" : "INACTIVE");
+      }
     }
-    creditDebouncing = false;
   }
   
-  lastCreditState = creditState;
+  lastStableState = currentState;
 }
 
 void handleGPIOCommands() {
@@ -310,6 +316,13 @@ void processGPIOCommand(String command) {
     } else {
       Serial.println("# LiDAR TRIGGER IGNORED - No credits remaining");
     }
+  }
+  else if (command == "RESET_CREDITS") {
+    creditCount = 0;
+    pbtHitCount = 0;
+    remainingStrikes = 0;
+    safetySystemActive = false;
+    Serial.println("# CREDITS RESET - All counters cleared");
   }
   else if (command == "STATUS") {
     Serial.print("# STATUS: Credits=");
