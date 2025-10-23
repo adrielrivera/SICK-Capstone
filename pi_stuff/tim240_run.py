@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import socket, time, math
+import socket, time, math, serial
 
 # --- Kite-shaped field detection system ---
 # No longer using the old single-point detector
@@ -65,6 +65,11 @@ TEST_THRESHOLDS = dict(
 # ---- LiDAR connection ----
 HOST, PORT = "192.168.0.20", 2111
 STX, ETX   = b"\x02", b"\x03"
+
+# ---- Arduino connection for safety system ----
+ARDUINO_PORT = "/dev/ttyUSB0"  # Adjust as needed
+ARDUINO_BAUD = 115200
+arduino_ser = None
 
 def send(sock, cmd, expect_reply=True, timeout=2.0):
     sock.settimeout(timeout)
@@ -183,6 +188,31 @@ def parse_lmd(frame_text):
 
 
 
+def init_arduino_connection():
+    """Initialize Arduino connection for safety system."""
+    global arduino_ser
+    try:
+        arduino_ser = serial.Serial(ARDUINO_PORT, ARDUINO_BAUD, timeout=1)
+        time.sleep(0.2)
+        arduino_ser.reset_input_buffer()
+        print(f"Arduino connected on {ARDUINO_PORT} @ {ARDUINO_BAUD} baud")
+        return True
+    except Exception as e:
+        print(f"WARNING: Could not connect to Arduino on {ARDUINO_PORT}: {e}")
+        print("Safety system will run without Arduino integration")
+        return False
+
+def send_arduino_trigger():
+    """Send safety trigger to Arduino."""
+    if arduino_ser and not arduino_ser.closed:
+        try:
+            # Send a simple trigger signal - Arduino will handle the alarm logic
+            arduino_ser.write(b"LIDAR_TRIGGER\n")
+            arduino_ser.flush()
+            print("  LiDAR trigger sent to Arduino")
+        except Exception as e:
+            print(f"  Error sending LiDAR trigger to Arduino: {e}")
+
 def main():
     # Initialize kite field detection system
     print("=" * 60)
@@ -190,7 +220,10 @@ def main():
     print("=" * 60)
     print_kite_field_info()
 
-    # Connect
+    # Initialize Arduino connection
+    arduino_connected = init_arduino_connection()
+
+    # Connect to LiDAR
     print(f"Connecting to TiM240 at {HOST}:{PORT}")
     s = socket.create_connection((HOST, PORT), timeout=3)
 
@@ -254,12 +287,17 @@ def main():
                                 print(f"  {v['type']}: {v['angle']:.1f}° at {v['distance']:.3f}m (safe: {v['safe_distance']:.3f}m)")
                         last_print = now_ms
 
-                    # Print on state change
+                    # Print on state change and handle safety triggers
                     if state != last_state:
                         print(f"{time.strftime('%H:%M:%S')}  state={state}  violations={len(violations)}")
                         if violations:
                             for v in violations:
                                 print(f"  {v['type']}: {v['angle']:.1f}° at {v['distance']:.3f}m (safe: {v['safe_distance']:.3f}m)")
+                        
+                        # Send safety trigger to Arduino if person detected (not hammer)
+                        if state == "ALERT_REAR" and arduino_connected:
+                            send_arduino_trigger()
+                        
                         last_state = state
 
             except socket.timeout:
@@ -275,6 +313,14 @@ def main():
         except Exception:
             pass
         s.close()
+        
+        # Close Arduino connection
+        if arduino_ser and not arduino_ser.closed:
+            try:
+                arduino_ser.close()
+                print("Arduino connection closed")
+            except Exception:
+                pass
 
 if __name__ == "__main__":
     main()
