@@ -23,7 +23,7 @@ const int EXPECTED_BASELINE_MAX = 450;
 // int creditCount = 0;
 // int pbtHitCount = 0;
 // int remainingStrikes = 0;
-// bool safetySystemActive = false;
+bool safetySystemActive = true; // Always active
 // int lastCreditState = HIGH;
 
 // Individual LiDAR Status
@@ -289,7 +289,7 @@ void processGPIOCommand(String command) {
       startTime = millis();
       Serial.println("# LiDAR TRIGGER - Siren ON (Safety System Active)");
     } else {
-      Serial.println("# LiDAR TRIGGER IGNORED - No credits remaining");
+      Serial.println("# LiDAR TRIGGER IGNORED - Safety System Inactive");
     }
   }
   // Credit reset command removed
@@ -402,13 +402,7 @@ void printDiagnostics() {
   Serial.print((range * 5.0) / 1023.0, 2);
   Serial.println("V)");
   
-  Serial.print("# CREDITS: Total=");
-  Serial.print(creditCount);
-  Serial.print(" PBT=");
-  Serial.print(pbtHitCount);
-  Serial.print(" Strikes=");
-  Serial.print(remainingStrikes);
-  Serial.print(" Safety=");
+  Serial.print("# SAFETY: System=");
   Serial.println(safetySystemActive ? "ACTIVE" : "INACTIVE");
   
   Serial.print("# LIDARS: TiM100=");
