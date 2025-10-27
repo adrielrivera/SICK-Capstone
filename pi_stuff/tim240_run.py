@@ -243,7 +243,25 @@ def read_tim1xx_status():
         try:
             while arduino_ser.in_waiting > 0:
                 line = arduino_ser.readline().decode(errors="ignore").strip()
-                if line.startswith("# LIDAR_STATUS:"):
+                
+                # Parse individual detection messages
+                if "TiM100 DETECTED" in line:
+                    tim100_detected = True
+                    last_tim1xx_update = time.time()
+                    print(f"\n🚨 TiM100 DETECTED - Person on LEFT side")
+                elif "TiM100 CLEAR" in line:
+                    tim100_detected = False
+                    last_tim1xx_update = time.time()
+                    print(f"\n✅ TiM100 CLEAR - LEFT side clear")
+                elif "TiM150 DETECTED" in line:
+                    tim150_detected = True
+                    last_tim1xx_update = time.time()
+                    print(f"\n🚨 TiM150 DETECTED - Person on RIGHT side")
+                elif "TiM150 CLEAR" in line:
+                    tim150_detected = False
+                    last_tim1xx_update = time.time()
+                    print(f"\n✅ TiM150 CLEAR - RIGHT side clear")
+                elif line.startswith("# LIDAR_STATUS:"):
                     # Parse: "TIM100=DETECTED TIM150=CLEAR"
                     parts = line.split()
                     if len(parts) >= 4:
@@ -262,9 +280,6 @@ def read_tim1xx_status():
                             print(f"   TiM100 (Left):  {'🚨 DETECTED' if tim100_detected else '✅ CLEAR'}")
                             print(f"   TiM150 (Right): {'🚨 DETECTED' if tim150_detected else '✅ CLEAR'}")
                             print(f"{'='*60}\n")
-                elif line.startswith("🚨") or line.startswith("✅"):
-                    # Display Arduino's enhanced messages
-                    print(f"\n{line}")
         except Exception as e:
             pass  # Ignore serial read errors
 
