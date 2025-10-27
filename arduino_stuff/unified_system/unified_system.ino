@@ -19,12 +19,12 @@ const int CALIBRATION_SAMPLES = 1000;
 const int EXPECTED_BASELINE_MIN = 350;
 const int EXPECTED_BASELINE_MAX = 450;
 
-// Credit System
-int creditCount = 0;
-int pbtHitCount = 0;
-int remainingStrikes = 0;
-bool safetySystemActive = false;
-int lastCreditState = HIGH;
+// Credit System - DISABLED
+// int creditCount = 0;
+// int pbtHitCount = 0;
+// int remainingStrikes = 0;
+// bool safetySystemActive = false;
+// int lastCreditState = HIGH;
 
 // Individual LiDAR Status
 bool tim100_detected = false;
@@ -32,11 +32,11 @@ bool tim150_detected = false;
 int lastTim100State = LOW;
 int lastTim150State = LOW;
 
-// Credit debouncing
-unsigned long lastCreditTime = 0;
-const unsigned long CREDIT_DEBOUNCE_MS = 300; // 300ms debounce time
-bool creditDebouncing = false;
-unsigned long creditDebounceStart = 0;
+// Credit debouncing - DISABLED
+// unsigned long lastCreditTime = 0;
+// const unsigned long CREDIT_DEBOUNCE_MS = 300; // 300ms debounce time
+// bool creditDebouncing = false;
+// unsigned long creditDebounceStart = 0;
 
 // PBT Sensor Variables
 int baselineOffset = 512;
@@ -66,7 +66,7 @@ bool gpioCommandReady = false;
 // Function declarations
 void handleGPIOCommands();
 void processGPIOCommand(String command);
-void checkCreditInsertion();
+// void checkCreditInsertion(); // DISABLED
 void checkPBTMessage();
 void updateSafetySystem();
 void checkLidarTrigger();
@@ -81,7 +81,7 @@ void setup() {
   
   // Pin setup
   pinMode(PBT_PIN, INPUT);
-  pinMode(CREDIT_PIN, INPUT_PULLUP);
+  // pinMode(CREDIT_PIN, INPUT_PULLUP); // DISABLED
   pinMode(TIM100_PIN, INPUT);  // TiM100 (Left) - no pull-up needed
   pinMode(TIM150_PIN, INPUT);  // TiM150 (Right) - no pull-up needed
   pinMode(BUZZER_PIN, OUTPUT);
@@ -113,8 +113,8 @@ void loop() {
   // Handle GPIO commands from Pi
   handleGPIOCommands();
   
-  // Check for credit insertion
-  checkCreditInsertion();
+  // Check for credit insertion - DISABLED
+  // checkCreditInsertion();
   
   // Check individual LiDAR status
   checkTim100Status();
@@ -129,13 +129,11 @@ void loop() {
   // Check for PBT hits from Pi
   checkPBTMessage();
   
-  // Update safety system status
-  updateSafetySystem();
+  // Update safety system status - DISABLED
+  // updateSafetySystem();
   
-  // Check LiDAR trigger (only if safety system active)
-  if (safetySystemActive) {
-    checkLidarTrigger();
-  }
+  // Check LiDAR trigger (always active now)
+  checkLidarTrigger();
   
   // Run siren if active
   runSiren();
@@ -227,44 +225,12 @@ void loop() {
   }
 }
 
+// Credit checking function - DISABLED
+/*
 void checkCreditInsertion() {
-  static unsigned long lastDebounceTime = 0;
-  static int lastStableState = HIGH;
-  int currentState = digitalRead(CREDIT_PIN);
-  
-  // If the state has changed, reset the debounce timer
-  if (currentState != lastStableState) {
-    lastDebounceTime = millis();
-    // Debug: Show state change
-    Serial.print("# Credit pin state changed to: ");
-    Serial.println(currentState == HIGH ? "HIGH" : "LOW");
-  }
-  
-  // If enough time has passed since the last state change
-  if ((millis() - lastDebounceTime) > CREDIT_DEBOUNCE_MS) {
-    // If the current state is different from the last recorded state
-    if (currentState != lastCreditState) {
-      lastCreditState = currentState;
-      
-      // Only register credit on falling edge (HIGH to LOW)
-      if (currentState == LOW) {
-        // Valid credit insertion (debounced)
-        creditCount++;
-        remainingStrikes = (creditCount * 2) - pbtHitCount;
-        safetySystemActive = (remainingStrikes > 0);
-        
-        Serial.print("# CREDIT INSERTED: Total=");
-        Serial.print(creditCount);
-        Serial.print(" Strikes=");
-        Serial.print(remainingStrikes);
-        Serial.print(" Safety=");
-        Serial.println(safetySystemActive ? "ACTIVE" : "INACTIVE");
-      }
-    }
-  }
-  
-  lastStableState = currentState;
+  // Function disabled - no credit tracking
 }
+*/
 
 void handleGPIOCommands() {
   // Read serial commands from Pi
@@ -292,20 +258,8 @@ void processGPIOCommand(String command) {
   command.trim();
   
   if (command == "PBT_HIT") {
-    pbtHitCount++;
-    remainingStrikes = (creditCount * 2) - pbtHitCount;
-    safetySystemActive = (remainingStrikes > 0);
-    
-    Serial.print("# PBT HIT: Total=");
-    Serial.print(pbtHitCount);
-    Serial.print(" Strikes=");
-    Serial.print(remainingStrikes);
-    Serial.print(" Safety=");
-    Serial.println(safetySystemActive ? "ACTIVE" : "INACTIVE");
-    
-    if (remainingStrikes <= 0) {
-      Serial.println("# GAME OVER - No strikes remaining");
-    }
+    // Simple PBT hit acknowledgment - no credit tracking
+    Serial.println("# PBT HIT: Received from Pi");
   }
   else if (command == "PIN6_HIGH") {
     digitalWrite(GPIO_PIN6, HIGH);
@@ -338,22 +292,13 @@ void processGPIOCommand(String command) {
       Serial.println("# LiDAR TRIGGER IGNORED - No credits remaining");
     }
   }
-  else if (command == "RESET_CREDITS") {
-    creditCount = 0;
-    pbtHitCount = 0;
-    remainingStrikes = 0;
-    safetySystemActive = false;
-    Serial.println("# CREDITS RESET - All counters cleared");
-  }
+  // Credit reset command removed
   else if (command == "STATUS") {
-    Serial.print("# STATUS: Credits=");
-    Serial.print(creditCount);
-    Serial.print(" PBT=");
-    Serial.print(pbtHitCount);
-    Serial.print(" Strikes=");
-    Serial.print(remainingStrikes);
-    Serial.print(" Safety=");
-    Serial.println(safetySystemActive ? "ACTIVE" : "INACTIVE");
+    Serial.print("# STATUS: Safety=ACTIVE");
+    Serial.print(" TiM100=");
+    Serial.print(tim100_detected ? "DETECTED" : "CLEAR");
+    Serial.print(" TiM150=");
+    Serial.println(tim150_detected ? "DETECTED" : "CLEAR");
   }
   else {
     Serial.print("# Unknown command: ");
@@ -362,7 +307,9 @@ void processGPIOCommand(String command) {
 }
 
 void updateSafetySystem() {
-  safetySystemActive = (remainingStrikes > 0);
+  // DISABLED - Safety system always active now
+  // safetySystemActive = (remainingStrikes > 0);
+  safetySystemActive = true; // Always active
 }
 
 void checkLidarTrigger() {
