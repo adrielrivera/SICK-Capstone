@@ -4,8 +4,9 @@
 
 const int PBT_PIN = A0;           // PBT sensor input
 const int CREDIT_PIN = 2;         // Credit falling edge input (with pull-up)
-const int LIDAR_PIN = 8;          // LiDAR safety trigger input
-const int BUZZER_PIN = 9;         // Piezo buzzer output
+const int TIM100_PIN = 8;         // TiM100 (Left) detection input
+const int TIM150_PIN = 9;         // TiM150 (Right) detection input
+const int BUZZER_PIN = 10;        // Piezo buzzer output (moved to avoid conflict)
 const int LED_PIN = 13;           // Status LED
 const int GPIO_PIN6 = 6;          // Arcade motherboard Pin 6 (Press START)
 const int GPIO_PIN5 = 5;           // Arcade motherboard Pin 5 (Press ACTIVE)
@@ -24,6 +25,12 @@ int pbtHitCount = 0;
 int remainingStrikes = 0;
 bool safetySystemActive = false;
 int lastCreditState = HIGH;
+
+// Individual LiDAR Status
+bool tim100_detected = false;
+bool tim150_detected = false;
+int lastTim100State = LOW;
+int lastTim150State = LOW;
 
 // Credit debouncing
 unsigned long lastCreditTime = 0;
@@ -63,6 +70,9 @@ void checkCreditInsertion();
 void checkPBTMessage();
 void updateSafetySystem();
 void checkLidarTrigger();
+void checkTim100Status();
+void checkTim150Status();
+void sendLidarStatus();
 void runSiren();
 void printDiagnostics();
 
@@ -72,7 +82,8 @@ void setup() {
   // Pin setup
   pinMode(PBT_PIN, INPUT);
   pinMode(CREDIT_PIN, INPUT_PULLUP);
-  pinMode(LIDAR_PIN, INPUT);
+  pinMode(TIM100_PIN, INPUT_PULLUP);  // TiM100 (Left) with pull-up
+  pinMode(TIM150_PIN, INPUT_PULLUP);  // TiM150 (Right) with pull-up
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   pinMode(GPIO_PIN6, OUTPUT);
@@ -104,6 +115,16 @@ void loop() {
   
   // Check for credit insertion
   checkCreditInsertion();
+  
+  // Check individual LiDAR status
+  checkTim100Status();
+  checkTim150Status();
+  
+  // Send LiDAR status to Pi every 100ms
+  if (nowMs - lastStatsMs >= 100) {
+    sendLidarStatus();
+    lastStatsMs = nowMs;
+  }
   
   // Check for PBT hits from Pi
   checkPBTMessage();
@@ -345,14 +366,51 @@ void updateSafetySystem() {
 }
 
 void checkLidarTrigger() {
-  int lidarState = digitalRead(LIDAR_PIN);
+  // This function is now handled by individual TiM1xx checks
+  // Keeping for compatibility but redirecting to new functions
+  checkTim100Status();
+  checkTim150Status();
+}
+
+void checkTim100Status() {
+  int currentState = digitalRead(TIM100_PIN);
   
-  // Start siren when pin goes HIGH (only if safety system is active)
-  if (lidarState == HIGH && !sirenActive && safetySystemActive) {
-    sirenActive = true;
-    startTime = millis();
-    Serial.println("# LiDAR TRIGGER - Siren ON (Safety System Active)");
+  // Detect falling edge (HIGH to LOW) - person detected
+  if (currentState == LOW && lastTim100State == HIGH) {
+    tim100_detected = true;
+    Serial.println("# TiM100 DETECTED - Person on LEFT side");
   }
+  // Detect rising edge (LOW to HIGH) - person cleared
+  else if (currentState == HIGH && lastTim100State == LOW) {
+    tim100_detected = false;
+    Serial.println("# TiM100 CLEAR - LEFT side clear");
+  }
+  
+  lastTim100State = currentState;
+}
+
+void checkTim150Status() {
+  int currentState = digitalRead(TIM150_PIN);
+  
+  // Detect falling edge (HIGH to LOW) - person detected
+  if (currentState == LOW && lastTim150State == HIGH) {
+    tim150_detected = true;
+    Serial.println("# TiM150 DETECTED - Person on RIGHT side");
+  }
+  // Detect rising edge (LOW to HIGH) - person cleared
+  else if (currentState == HIGH && lastTim150State == LOW) {
+    tim150_detected = false;
+    Serial.println("# TiM150 CLEAR - RIGHT side clear");
+  }
+  
+  lastTim150State = currentState;
+}
+
+void sendLidarStatus() {
+  Serial.print("# LIDAR_STATUS: TIM100=");
+  Serial.print(tim100_detected ? "DETECTED" : "CLEAR");
+  Serial.print(" TIM150=");
+  Serial.println(tim150_detected ? "DETECTED" : "CLEAR");
 }
 
 void runSiren() {
@@ -401,6 +459,11 @@ void printDiagnostics() {
   Serial.print(remainingStrikes);
   Serial.print(" Safety=");
   Serial.println(safetySystemActive ? "ACTIVE" : "INACTIVE");
+  
+  Serial.print("# LIDARS: TiM100=");
+  Serial.print(tim100_detected ? "DETECTED" : "CLEAR");
+  Serial.print(" TiM150=");
+  Serial.println(tim150_detected ? "DETECTED" : "CLEAR");
   
   if (range < 20) {
     Serial.println("# No PBT activity detected");

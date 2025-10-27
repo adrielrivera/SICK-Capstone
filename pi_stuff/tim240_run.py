@@ -1,6 +1,15 @@
 #!/usr/bin/env python3
 import socket, time, math, serial
 
+# ---- Multi-LiDAR Safety System ----
+# TiM240: Ethernet -> Pi (rear detection)
+# TiM100/TiM150: Arduino -> Pi (left/right detection)
+
+# Individual LiDAR status tracking
+tim100_detected = False
+tim150_detected = False
+last_tim1xx_update = 0
+
 # --- Kite-shaped field detection system ---
 # No longer using the old single-point detector
 
@@ -226,6 +235,59 @@ def read_arduino_messages():
         except Exception as e:
             pass  # Ignore serial read errors
 
+def read_tim1xx_status():
+    """Read TiM1xx status from Arduino."""
+    global tim100_detected, tim150_detected, last_tim1xx_update, arduino_ser
+    
+    if arduino_ser and not arduino_ser.closed:
+        try:
+            while arduino_ser.in_waiting > 0:
+                line = arduino_ser.readline().decode(errors="ignore").strip()
+                if line.startswith("# LIDAR_STATUS:"):
+                    # Parse: "TIM100=DETECTED TIM150=CLEAR"
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        tim100_status = "DETECTED" in parts[1]
+                        tim150_status = "DETECTED" in parts[3]
+                        
+                        # Only update if status changed
+                        if tim100_detected != tim100_status or tim150_detected != tim150_status:
+                            tim100_detected = tim100_status
+                            tim150_detected = tim150_status
+                            last_tim1xx_update = time.time()
+                            
+                            print(f"  TiM1xx Status: TiM100={'DETECTED' if tim100_detected else 'CLEAR'}, TiM150={'DETECTED' if tim150_detected else 'CLEAR'}")
+        except Exception as e:
+            pass  # Ignore serial read errors
+
+def get_combined_safety_status():
+    """Get combined safety status from all LiDARs."""
+    global tim100_detected, tim150_detected
+    
+    # Get TiM240 status (from existing state variable)
+    tim240_alert = (state == "ALERT_REAR")
+    
+    # Determine combined status
+    if tim240_alert or tim100_detected or tim150_detected:
+        unsafe_areas = []
+        if tim240_alert: unsafe_areas.append("REAR")
+        if tim100_detected: unsafe_areas.append("LEFT")
+        if tim150_detected: unsafe_areas.append("RIGHT")
+        
+        return "DANGER", {
+            'rear': tim240_alert,
+            'left': tim100_detected,
+            'right': tim150_detected,
+            'areas': unsafe_areas
+        }
+    else:
+        return "SAFE", {
+            'rear': False,
+            'left': False,
+            'right': False,
+            'areas': []
+        }
+
 def main():
     # Initialize kite field detection system
     print("=" * 60)
@@ -281,6 +343,9 @@ def main():
                     # Read Arduino messages (credit tracking, status updates)
                     read_arduino_messages()
                     
+                    # Read TiM1xx status from Arduino
+                    read_tim1xx_status()
+                    
                     # Request Arduino status every 5 seconds
                     if now_ms - last_status_request >= 5000:
                         if arduino_ser and not arduino_ser.closed:
@@ -321,8 +386,11 @@ def main():
                             for v in violations:
                                 print(f"  {v['type']}: {v['angle']:.1f}° at {v['distance']:.3f}m (safe: {v['safe_distance']:.3f}m)")
                         
-                        # Send safety trigger to Arduino if person detected (not hammer)
-                        if state == "ALERT_REAR" and arduino_connected:
+                        # Send safety trigger to Arduino if any LiDAR detects person
+                        safety_status, safety_info = get_combined_safety_status()
+                        if safety_status == "DANGER" and arduino_connected:
+                            areas = safety_info['areas']
+                            print(f"  Multi-LiDAR Alert: {', '.join(areas)}")
                             send_arduino_trigger()
                         
                         last_state = state
