@@ -82,8 +82,8 @@ void setup() {
   // Pin setup
   pinMode(PBT_PIN, INPUT);
   pinMode(CREDIT_PIN, INPUT_PULLUP);
-  pinMode(TIM100_PIN, INPUT_PULLUP);  // TiM100 (Left) with pull-up
-  pinMode(TIM150_PIN, INPUT_PULLUP);  // TiM150 (Right) with pull-up
+  pinMode(TIM100_PIN, INPUT);  // TiM100 (Left) - no pull-up needed
+  pinMode(TIM150_PIN, INPUT);  // TiM150 (Right) - no pull-up needed
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   pinMode(GPIO_PIN6, OUTPUT);
@@ -375,14 +375,14 @@ void checkLidarTrigger() {
 void checkTim100Status() {
   int currentState = digitalRead(TIM100_PIN);
   
-  // Detect falling edge (HIGH to LOW) - person detected
-  if (currentState == LOW && lastTim100State == HIGH) {
+  // Detect rising edge (LOW to HIGH) - person detected
+  if (currentState == HIGH && lastTim100State == LOW) {
     tim100_detected = true;
     Serial.println("🚨 ===== PERSON DETECTED - LEFT SIDE (TiM100) =====");
     Serial.println("# TiM100 DETECTED - Person on LEFT side");
   }
-  // Detect rising edge (LOW to HIGH) - person cleared
-  else if (currentState == HIGH && lastTim100State == LOW) {
+  // Detect falling edge (HIGH to LOW) - person cleared
+  else if (currentState == LOW && lastTim100State == HIGH) {
     tim100_detected = false;
     Serial.println("✅ ===== AREA CLEAR - LEFT SIDE (TiM100) =====");
     Serial.println("# TiM100 CLEAR - LEFT side clear");
@@ -394,14 +394,14 @@ void checkTim100Status() {
 void checkTim150Status() {
   int currentState = digitalRead(TIM150_PIN);
   
-  // Detect falling edge (HIGH to LOW) - person detected
-  if (currentState == LOW && lastTim150State == HIGH) {
+  // Detect rising edge (LOW to HIGH) - person detected
+  if (currentState == HIGH && lastTim150State == LOW) {
     tim150_detected = true;
     Serial.println("🚨 ===== PERSON DETECTED - RIGHT SIDE (TiM150) =====");
     Serial.println("# TiM150 DETECTED - Person on RIGHT side");
   }
-  // Detect rising edge (LOW to HIGH) - person cleared
-  else if (currentState == HIGH && lastTim150State == LOW) {
+  // Detect falling edge (HIGH to LOW) - person cleared
+  else if (currentState == LOW && lastTim150State == HIGH) {
     tim150_detected = false;
     Serial.println("✅ ===== AREA CLEAR - RIGHT SIDE (TiM150) =====");
     Serial.println("# TiM150 CLEAR - RIGHT side clear");
