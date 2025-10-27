@@ -10,6 +10,10 @@ bool tim150_detected = false;
 int lastTim100State = LOW;
 int lastTim150State = LOW;
 
+// Status reporting timing
+unsigned long lastStatusReport = 0;
+const unsigned long STATUS_INTERVAL = 500;  // Report every 500ms (0.5 seconds)
+
 void setup() {
   Serial.begin(115200);
   
@@ -33,6 +37,13 @@ void loop() {
   // Check TiM150 status
   checkTim150Status();
   
+  // Report status every 0.5 seconds
+  unsigned long currentTime = millis();
+  if (currentTime - lastStatusReport >= STATUS_INTERVAL) {
+    reportStatus();
+    lastStatusReport = currentTime;
+  }
+  
   // Small delay to prevent overwhelming serial output
   delay(10);
 }
@@ -43,12 +54,12 @@ void checkTim100Status() {
   // Detect rising edge (LOW to HIGH) - person detected
   if (currentState == HIGH && lastTim100State == LOW) {
     tim100_detected = true;
-    Serial.println("🚨 TiM100 DETECTED - Person on LEFT side");
+    // Status will be reported in next status update
   }
   // Detect falling edge (HIGH to LOW) - person cleared
   else if (currentState == LOW && lastTim100State == HIGH) {
     tim100_detected = false;
-    Serial.println("✅ TiM100 CLEAR - LEFT side clear");
+    // Status will be reported in next status update
   }
   
   lastTim100State = currentState;
@@ -60,13 +71,20 @@ void checkTim150Status() {
   // Detect rising edge (LOW to HIGH) - person detected
   if (currentState == HIGH && lastTim150State == LOW) {
     tim150_detected = true;
-    Serial.println("🚨 TiM150 DETECTED - Person on RIGHT side");
+    // Status will be reported in next status update
   }
   // Detect falling edge (HIGH to LOW) - person cleared
   else if (currentState == LOW && lastTim150State == HIGH) {
     tim150_detected = false;
-    Serial.println("✅ TiM150 CLEAR - RIGHT side clear");
+    // Status will be reported in next status update
   }
   
   lastTim150State = currentState;
+}
+
+void reportStatus() {
+  Serial.print("TiM100: ");
+  Serial.print(tim100_detected ? "DETECTED" : "CLEAR");
+  Serial.print(" | TiM150: ");
+  Serial.println(tim150_detected ? "DETECTED" : "CLEAR");
 }
