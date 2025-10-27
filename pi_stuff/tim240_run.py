@@ -256,7 +256,15 @@ def read_tim1xx_status():
                             tim150_detected = tim150_status
                             last_tim1xx_update = time.time()
                             
-                            print(f"  TiM1xx Status: TiM100={'DETECTED' if tim100_detected else 'CLEAR'}, TiM150={'DETECTED' if tim150_detected else 'CLEAR'}")
+                            # Enhanced terminal output
+                            print(f"\n{'='*60}")
+                            print(f"🔍 LiDAR STATUS UPDATE - {time.strftime('%H:%M:%S')}")
+                            print(f"   TiM100 (Left):  {'🚨 DETECTED' if tim100_detected else '✅ CLEAR'}")
+                            print(f"   TiM150 (Right): {'🚨 DETECTED' if tim150_detected else '✅ CLEAR'}")
+                            print(f"{'='*60}\n")
+                elif line.startswith("🚨") or line.startswith("✅"):
+                    # Display Arduino's enhanced messages
+                    print(f"\n{line}")
         except Exception as e:
             pass  # Ignore serial read errors
 
@@ -382,6 +390,23 @@ def main():
                     # Print on state change and handle safety triggers
                     if state != last_state:
                         print(f"{time.strftime('%H:%M:%S')}  state={state}  violations={len(violations)}")
+                        
+                        # Enhanced output for TiM240 detection
+                        if state == "ALERT_REAR":
+                            print(f"\n🚨 ===== TiM240 PERSON DETECTED - REAR SIDE =====")
+                            print(f"   Time: {time.strftime('%H:%M:%S')}")
+                            print(f"   Sensor: TiM240 (Rear)")
+                            print(f"   Violations: {len(violations)}")
+                            if violations:
+                                for v in violations:
+                                    print(f"   - {v['type']}: {v['angle']:.1f}° at {v['distance']:.3f}m (safe: {v['safe_distance']:.3f}m)")
+                            print(f"🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨\n")
+                        elif state == "SAFE" and last_state == "ALERT_REAR":
+                            print(f"\n✅ ===== TiM240 AREA CLEAR - REAR SIDE =====")
+                            print(f"   Time: {time.strftime('%H:%M:%S')}")
+                            print(f"   Sensor: TiM240 (Rear)")
+                            print(f"✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅\n")
+                        
                         if violations:
                             for v in violations:
                                 print(f"  {v['type']}: {v['angle']:.1f}° at {v['distance']:.3f}m (safe: {v['safe_distance']:.3f}m)")
@@ -390,7 +415,11 @@ def main():
                         safety_status, safety_info = get_combined_safety_status()
                         if safety_status == "DANGER" and arduino_connected:
                             areas = safety_info['areas']
-                            print(f"  Multi-LiDAR Alert: {', '.join(areas)}")
+                            print(f"\n🚨🚨🚨 MULTI-LIDAR SAFETY ALERT 🚨🚨🚨")
+                            print(f"   Time: {time.strftime('%H:%M:%S')}")
+                            print(f"   Detected Areas: {', '.join(areas)}")
+                            print(f"   Action: Game disabled, Alarm triggered")
+                            print(f"🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨\n")
                             send_arduino_trigger()
                         
                         last_state = state
