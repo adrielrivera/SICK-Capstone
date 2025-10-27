@@ -375,39 +375,39 @@ void checkLidarTrigger() {
 void checkTim100Status() {
   int currentState = digitalRead(TIM100_PIN);
   
-  // Detect rising edge (LOW to HIGH) - person detected
-  if (currentState == HIGH && lastTim100State == LOW) {
-    tim100_detected = true;
-    Serial.println("🚨 ===== PERSON DETECTED - LEFT SIDE (TiM100) =====");
-    Serial.println("# TiM100 DETECTED - Person on LEFT side");
-  }
-  // Detect falling edge (HIGH to LOW) - person cleared
-  else if (currentState == LOW && lastTim100State == HIGH) {
-    tim100_detected = false;
-    Serial.println("✅ ===== AREA CLEAR - LEFT SIDE (TiM100) =====");
-    Serial.println("# TiM100 CLEAR - LEFT side clear");
-  }
+  // Simple state reading (like the working test code)
+  tim100_detected = (currentState == HIGH);
   
-  lastTim100State = currentState;
+  // Only print on state change
+  if (currentState != lastTim100State) {
+    if (tim100_detected) {
+      Serial.println("🚨 ===== PERSON DETECTED - LEFT SIDE (TiM100) =====");
+      Serial.println("# TiM100 DETECTED - Person on LEFT side");
+    } else {
+      Serial.println("✅ ===== AREA CLEAR - LEFT SIDE (TiM100) =====");
+      Serial.println("# TiM100 CLEAR - LEFT side clear");
+    }
+    lastTim100State = currentState;
+  }
 }
 
 void checkTim150Status() {
   int currentState = digitalRead(TIM150_PIN);
   
-  // Detect rising edge (LOW to HIGH) - person detected
-  if (currentState == HIGH && lastTim150State == LOW) {
-    tim150_detected = true;
-    Serial.println("🚨 ===== PERSON DETECTED - RIGHT SIDE (TiM150) =====");
-    Serial.println("# TiM150 DETECTED - Person on RIGHT side");
-  }
-  // Detect falling edge (HIGH to LOW) - person cleared
-  else if (currentState == LOW && lastTim150State == HIGH) {
-    tim150_detected = false;
-    Serial.println("✅ ===== AREA CLEAR - RIGHT SIDE (TiM150) =====");
-    Serial.println("# TiM150 CLEAR - RIGHT side clear");
-  }
+  // Simple state reading (like the working test code)
+  tim150_detected = (currentState == HIGH);
   
-  lastTim150State = currentState;
+  // Only print on state change
+  if (currentState != lastTim150State) {
+    if (tim150_detected) {
+      Serial.println("🚨 ===== PERSON DETECTED - RIGHT SIDE (TiM150) =====");
+      Serial.println("# TiM150 DETECTED - Person on RIGHT side");
+    } else {
+      Serial.println("✅ ===== AREA CLEAR - RIGHT SIDE (TiM150) =====");
+      Serial.println("# TiM150 CLEAR - RIGHT side clear");
+    }
+    lastTim150State = currentState;
+  }
 }
 
 void sendLidarStatus() {
