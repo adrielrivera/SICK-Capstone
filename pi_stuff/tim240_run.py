@@ -244,6 +244,10 @@ def read_tim1xx_status():
             while arduino_ser.in_waiting > 0:
                 line = arduino_ser.readline().decode(errors="ignore").strip()
                 
+                # Debug: Print ALL Arduino messages
+                if line:
+                    print(f"DEBUG Arduino: '{line}'")
+                
                 # Parse individual detection messages
                 if "TiM100 DETECTED" in line:
                     tim100_detected = True
@@ -281,6 +285,7 @@ def read_tim1xx_status():
                             print(f"   TiM150 (Right): {'🚨 DETECTED' if tim150_detected else '✅ CLEAR'}")
                             print(f"{'='*60}\n")
         except Exception as e:
+            print(f"DEBUG Serial Error: {e}")
             pass  # Ignore serial read errors
 
 def get_combined_safety_status():
