@@ -241,6 +241,10 @@ def read_tim1xx_status():
     
     if arduino_ser and not arduino_ser.closed:
         try:
+            # Debug: Check if there's data waiting
+            if arduino_ser.in_waiting > 0:
+                print(f"DEBUG: {arduino_ser.in_waiting} bytes waiting from Arduino")
+            
             while arduino_ser.in_waiting > 0:
                 line = arduino_ser.readline().decode(errors="ignore").strip()
                 
@@ -287,6 +291,8 @@ def read_tim1xx_status():
         except Exception as e:
             print(f"DEBUG Serial Error: {e}")
             pass  # Ignore serial read errors
+    else:
+        print("DEBUG: Arduino not connected or closed")
 
 def get_combined_safety_status():
     """Get combined safety status from all LiDARs."""
