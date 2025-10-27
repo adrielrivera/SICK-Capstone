@@ -32,6 +32,18 @@ void loop() {
   int tim100_state = digitalRead(TIM100_PIN);
   int tim150_state = digitalRead(TIM150_PIN);
   
+  // Debug: Print raw pin values every 100ms
+  static unsigned long lastDebug = 0;
+  if (millis() - lastDebug >= 100) {
+    Serial.print("Pin 8: ");
+    Serial.print(tim100_state);
+    Serial.print(" | Pin 9: ");
+    Serial.print(tim150_state);
+    Serial.print(" | TiM150: ");
+    Serial.println(tim150_detected ? "DETECTED" : "CLEAR");
+    lastDebug = millis();
+  }
+  
   // Update detection status based on current state
   tim100_detected = (tim100_state == HIGH);
   tim150_detected = (tim150_state == HIGH);
