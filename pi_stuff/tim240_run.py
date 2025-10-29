@@ -327,17 +327,30 @@ def get_combined_safety_status(state):
         }
 
 def main():
-    # Initialize GPIO
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(DETECTION_GPIO_PIN, GPIO.OUT)
-    GPIO.output(DETECTION_GPIO_PIN, GPIO.LOW)  # Start with no detection
+    # Initialize GPIO with error handling
+    gpio_working = False
+    try:
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(DETECTION_GPIO_PIN, GPIO.OUT)
+        GPIO.output(DETECTION_GPIO_PIN, GPIO.LOW)  # Start with no detection
+        gpio_working = True
+        print("✅ GPIO initialized successfully")
+    except RuntimeError as e:
+        print(f"⚠️  GPIO initialization failed: {e}")
+        print("   Try running with: sudo python3 tim240_run.py")
+        print("   Or add user to gpio group: sudo usermod -a -G gpio $USER")
+    except Exception as e:
+        print(f"⚠️  GPIO error: {e}")
     
     # Initialize kite field detection system
     print("=" * 60)
     print("SICK7 - TiM240 Kite-Shaped Safety Field")
     print("=" * 60)
     print_kite_field_info()
-    print(f"GPIO Detection Output: Pin {DETECTION_GPIO_PIN} (3.3V when person detected)")
+    if gpio_working:
+        print(f"GPIO Detection Output: Pin {DETECTION_GPIO_PIN} (3.3V when person detected)")
+    else:
+        print("GPIO Detection Output: Disabled (GPIO access failed)")
 
     # Initialize Arduino connection
     arduino_connected = init_arduino_connection()
@@ -416,9 +429,10 @@ def main():
                     state = out.get("state")
                     violations = out.get("violations", [])
                     
-                    # Control GPIO based on person detection
+                    # Control GPIO based on person detection (only if GPIO is working)
                     person_detected = (state == "ALERT_REAR")
-                    GPIO.output(DETECTION_GPIO_PIN, GPIO.HIGH if person_detected else GPIO.LOW)
+                    if gpio_working:
+                        GPIO.output(DETECTION_GPIO_PIN, GPIO.HIGH if person_detected else GPIO.LOW)
                     
                     if now_ms - last_print >= 2000:
                         print(f"{time.strftime('%H:%M:%S')}  state={state}  violations={len(violations)}  GPIO={'HIGH' if person_detected else 'LOW'}")
@@ -486,10 +500,11 @@ def main():
             except Exception:
                 pass
         
-        # Cleanup GPIO
-        GPIO.output(DETECTION_GPIO_PIN, GPIO.LOW)
-        GPIO.cleanup()
-        print("GPIO cleaned up")
+        # Cleanup GPIO (only if it was working)
+        if gpio_working:
+            GPIO.output(DETECTION_GPIO_PIN, GPIO.LOW)
+            GPIO.cleanup()
+            print("GPIO cleaned up")
 
 if __name__ == "__main__":
     main()
