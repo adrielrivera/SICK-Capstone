@@ -109,11 +109,8 @@ class LiDARDetectionSystem:
         self.arduino = None
         self.running = False
         
-        # Status tracking
-        self.tim100_detected = False
-        self.tim150_detected = False
-        self.tim240_detected = False
-        self.any_detection = False
+        # Status tracking (simplified - only knows if ANY LiDAR is detecting)
+        self.person_detected = False
         self.alarm_active = False
         
         # Status callbacks for webapp
@@ -126,10 +123,7 @@ class LiDARDetectionSystem:
     def notify_status_change(self):
         """Notify all callbacks of status change."""
         status = {
-            'tim100_detected': self.tim100_detected,
-            'tim150_detected': self.tim150_detected,
-            'tim240_detected': self.tim240_detected,
-            'any_detection': self.any_detection,
+            'person_detected': self.person_detected,
             'alarm_active': self.alarm_active
         }
         for callback in self.status_callbacks:
@@ -160,14 +154,11 @@ class LiDARDetectionSystem:
                 line = self.arduino.readline().decode(errors='ignore').strip()
                 
                 if line.startswith("LIDAR_STATUS:"):
-                    # Parse status: tim100,tim150,tim240,any_detection,alarm_active
+                    # Parse status: person_detected,alarm_active
                     parts = line.split(":")[1].split(",")
-                    if len(parts) >= 5:
-                        self.tim100_detected = parts[0] == "1"
-                        self.tim150_detected = parts[1] == "1"
-                        self.tim240_detected = parts[2] == "1"
-                        self.any_detection = parts[3] == "1"
-                        self.alarm_active = parts[4] == "1"
+                    if len(parts) >= 2:
+                        self.person_detected = parts[0] == "1"
+                        self.alarm_active = parts[1] == "1"
                         
                         self.notify_status_change()
                 
