@@ -294,7 +294,7 @@ def read_tim1xx_status():
     else:
         print("DEBUG: Arduino not connected or closed")
 
-def get_combined_safety_status():
+def get_combined_safety_status(state):
     """Get combined safety status from all LiDARs."""
     global tim100_detected, tim150_detected
     
@@ -438,7 +438,7 @@ def main():
                                 print(f"  {v['type']}: {v['angle']:.1f}° at {v['distance']:.3f}m (safe: {v['safe_distance']:.3f}m)")
                         
                         # Send safety trigger to Arduino if any LiDAR detects person
-                        safety_status, safety_info = get_combined_safety_status()
+                        safety_status, safety_info = get_combined_safety_status(state)
                         if safety_status == "DANGER" and arduino_connected:
                             areas = safety_info['areas']
                             print(f"\n🚨🚨🚨 MULTI-LIDAR SAFETY ALERT 🚨🚨🚨")
