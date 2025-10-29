@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiDAR Detection Monitor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.8;
+            font-size: 1.1em;
+        }
+        
+        .status-panel {
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .sensor-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-left: 5px solid #ddd;
+            transition: all 0.3s ease;
+        }
+        
+        .sensor-card.detected {
+            border-left-color: #e74c3c;
+            background: #fdf2f2;
+            animation: pulse 1s infinite;
+        }
+        
+        .sensor-card.clear {
+            border-left-color: #27ae60;
+            background: #f2fdf2;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+        
+        .sensor-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .sensor-icon {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+        
+        .sensor-status {
+            font-size: 1.1em;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        
+        .sensor-location {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .alarm-panel {
+            background: #fff;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .alarm-status {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        
+        .alarm-status.active {
+            background: #e74c3c;
+            color: white;
+            animation: alarmPulse 0.5s infinite alternate;
+        }
+        
+        .alarm-status.inactive {
+            background: #27ae60;
+            color: white;
+        }
+        
+        @keyframes alarmPulse {
+            from { opacity: 1; }
+            to { opacity: 0.7; }
+        }
+        
+        .control-panel {
+            background: #fff;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .control-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .btn-test {
+            background: #3498db;
+            color: white;
+        }
+        
+        .btn-test:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        
+        .btn-reset {
+            background: #e67e22;
+            color: white;
+        }
+        
+        .btn-reset:hover {
+            background: #d35400;
+            transform: translateY(-2px);
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-indicator.online {
+            background: #27ae60;
+            box-shadow: 0 0 10px rgba(39, 174, 96, 0.5);
+        }
+        
+        .status-indicator.offline {
+            background: #e74c3c;
+        }
+        
+        .connection-status {
+            text-align: center;
+            padding: 15px;
+            background: #ecf0f1;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .log-panel {
+            background: #2c3e50;
+            color: #ecf0f1;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .log-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #3498db;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        
+        .log-entry.detection {
+            background: rgba(231, 76, 60, 0.2);
+            border-left: 3px solid #e74c3c;
+        }
+        
+        .log-entry.clear {
+            background: rgba(39, 174, 96, 0.2);
+            border-left: 3px solid #27ae60;
+        }
+        
+        .log-entry.alarm {
+            background: rgba(230, 126, 34, 0.2);
+            border-left: 3px solid #e67e22;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ LiDAR Detection System</h1>
+            <p>Real-time monitoring of TiM100, TiM150, and TiM240 sensors</p>
+        </div>
+        
+        <div class="status-panel">
+            <!-- Connection Status -->
+            <div class="connection-status">
+                <span class="status-indicator offline" id="connectionIndicator"></span>
+                <span id="connectionText">Connecting to system...</span>
+            </div>
+            
+            <!-- Alarm Status -->
+            <div class="alarm-panel">
+                <div class="alarm-status inactive" id="alarmStatus">
+                    🔇 System Ready - No Alarms
+                </div>
+            </div>
+            
+            <!-- Sensor Status Grid -->
+            <div class="sensor-grid">
+                <div class="sensor-card clear" id="tim100Card">
+                    <div class="sensor-title">
+                        <span class="sensor-icon">📡</span>
+                        TiM100 Sensor
+                    </div>
+                    <div class="sensor-status" id="tim100Status">CLEAR</div>
+                    <div class="sensor-location">Left Side Detection</div>
+                </div>
+                
+                <div class="sensor-card clear" id="tim150Card">
+                    <div class="sensor-title">
+                        <span class="sensor-icon">📡</span>
+                        TiM150 Sensor
+                    </div>
+                    <div class="sensor-status" id="tim150Status">CLEAR</div>
+                    <div class="sensor-location">Right Side Detection</div>
+                </div>
+                
+                <div class="sensor-card clear" id="tim240Card">
+                    <div class="sensor-title">
+                        <span class="sensor-icon">📡</span>
+                        TiM240 Sensor
+                    </div>
+                    <div class="sensor-status" id="tim240Status">CLEAR</div>
+                    <div class="sensor-location">Rear Detection</div>
+                </div>
+            </div>
+            
+            <!-- Control Panel -->
+            <div class="control-panel">
+                <div class="control-title">System Controls</div>
+                <div class="button-grid">
+                    <button class="btn btn-test" onclick="testSensor('tim100')">Test TiM100</button>
+                    <button class="btn btn-test" onclick="testSensor('tim150')">Test TiM150</button>
+                    <button class="btn btn-test" onclick="testSensor('tim240')">Test TiM240</button>
+                    <button class="btn btn-reset" onclick="resetAlarm()">Reset Alarm</button>
+                </div>
+            </div>
+            
+            <!-- Log Panel -->
+            <div class="log-panel">
+                <div class="log-title">System Log</div>
+                <div id="logContainer">
+                    <div class="log-entry">System starting...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // WebSocket connection
+        const socket = io();
+        
+        // Status variables
+        let systemConnected = false;
+        let alarmActive = false;
+        let logEntries = [];
+        
+        // DOM elements
+        const connectionIndicator = document.getElementById('connectionIndicator');
+        const connectionText = document.getElementById('connectionText');
+        const alarmStatus = document.getElementById('alarmStatus');
+        const logContainer = document.getElementById('logContainer');
+        
+        // Sensor cards
+        const sensorCards = {
+            tim100: document.getElementById('tim100Card'),
+            tim150: document.getElementById('tim150Card'),
+            tim240: document.getElementById('tim240Card')
+        };
+        
+        const sensorStatuses = {
+            tim100: document.getElementById('tim100Status'),
+            tim150: document.getElementById('tim150Status'),
+            tim240: document.getElementById('tim240Status')
+        };
+        
+        // WebSocket event handlers
+        socket.on('connect', function() {
+            console.log('Connected to server');
+            updateConnectionStatus(true);
+            addLogEntry('Connected to LiDAR detection system', 'clear');
+        });
+        
+        socket.on('disconnect', function() {
+            console.log('Disconnected from server');
+            updateConnectionStatus(false);
+            addLogEntry('Disconnected from system', 'clear');
+        });
+        
+        socket.on('lidar_status', function(data) {
+            console.log('LiDAR status update:', data);
+            updateSystemStatus(data);
+        });
+        
+        socket.on('test_result', function(data) {
+            console.log('Test result:', data);
+            addLogEntry(`${data.sensor || data.action}: ${data.status}`, 'clear');
+        });
+        
+        // Update connection status
+        function updateConnectionStatus(connected) {
+            systemConnected = connected;
+            if (connected) {
+                connectionIndicator.className = 'status-indicator online';
+                connectionText.textContent = 'System Connected';
+            } else {
+                connectionIndicator.className = 'status-indicator offline';
+                connectionText.textContent = 'System Disconnected';
+            }
+        }
+        
+        // Update system status
+        function updateSystemStatus(data) {
+            // Update sensor statuses
+            updateSensorStatus('tim100', data.tim100_detected);
+            updateSensorStatus('tim150', data.tim150_detected);
+            updateSensorStatus('tim240', data.tim240_detected);
+            
+            // Update alarm status
+            if (data.alarm_active !== alarmActive) {
+                alarmActive = data.alarm_active;
+                updateAlarmStatus();
+                
+                if (alarmActive) {
+                    addLogEntry('🚨 ALARM ACTIVATED - Person detected!', 'alarm');
+                } else {
+                    addLogEntry('🔇 Alarm deactivated', 'clear');
+                }
+            }
+            
+            // Log detection changes
+            if (data.any_detection) {
+                const sensors = [];
+                if (data.tim100_detected) sensors.push('TiM100');
+                if (data.tim150_detected) sensors.push('TiM150');
+                if (data.tim240_detected) sensors.push('TiM240');
+                addLogEntry(`Person detected by: ${sensors.join(', ')}`, 'detection');
+            }
+        }
+        
+        // Update individual sensor status
+        function updateSensorStatus(sensor, detected) {
+            const card = sensorCards[sensor];
+            const status = sensorStatuses[sensor];
+            
+            if (detected) {
+                card.className = 'sensor-card detected';
+                status.textContent = 'DETECTED';
+            } else {
+                card.className = 'sensor-card clear';
+                status.textContent = 'CLEAR';
+            }
+        }
+        
+        // Update alarm status
+        function updateAlarmStatus() {
+            if (alarmActive) {
+                alarmStatus.className = 'alarm-status active';
+                alarmStatus.textContent = '🚨 ALARM ACTIVE - Person Detected!';
+            } else {
+                alarmStatus.className = 'alarm-status inactive';
+                alarmStatus.textContent = '🔇 System Ready - No Alarms';
+            }
+        }
+        
+        // Add log entry
+        function addLogEntry(message, type = 'clear') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            // Keep only last 50 entries
+            while (logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+        }
+        
+        // Test sensor functions
+        function testSensor(sensor) {
+            console.log(`Testing ${sensor}`);
+            socket.emit(`test_${sensor}`);
+        }
+        
+        function resetAlarm() {
+            console.log('Resetting alarm');
+            socket.emit('reset_alarm');
+        }
+        
+        // Request initial status
+        socket.emit('request_status');
+        
+        // Add initial log entry
+        addLogEntry('LiDAR Detection Monitor loaded', 'clear');
+    </script>
+</body>
+</html>
