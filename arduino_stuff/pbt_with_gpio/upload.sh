@@ -1,12 +1,12 @@
 #!/bin/bash
-# Arduino Upload Script for Simple PBT Sensor (No GPIO)
+# Arduino Upload Script for PBT Sensor with GPIO Control
 
 ARDUINO_DIR="$(dirname "$0")"
-SKETCH_NAME="pbt_only_simple.ino"
+SKETCH_NAME="pbt_with_gpio.ino"
 FQBN="arduino:avr:uno" # Fully Qualified Board Name for Arduino Uno
 
 echo "=========================================="
-echo "Simple PBT Sensor Arduino Upload Script"
+echo "PBT Sensor with GPIO Arduino Upload Script"
 echo "=========================================="
 
 # Find Arduino port

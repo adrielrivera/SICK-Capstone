@@ -1,8 +1,5 @@
-// SICK 10 Bar PBT Sensor - Optimized for Real Hardware
-// Based on oscilloscope measurements:
-// - Baseline: ~1.88V = ~385 ADC counts
-// - Peak: ~2.96V = ~607 ADC counts
-// - Pulse duration: ~700ms
+// SICK 10 Bar PBT Sensor with GPIO Control
+// Reads PBT sensor and controls arcade GPIO pins via serial commands from Raspberry Pi
 
 const int PBT_PIN = A0;
 const int LED_PIN = 13;
@@ -37,7 +34,7 @@ int activityThreshold = 30;  // ~30 counts above baseline
 unsigned long lastActivityMs = 0;
 const unsigned long LED_ON_MS = 100;
 
-// GPIO command buffer
+// GPIO command handling
 String gpioCommand = "";
 bool gpioCommandReady = false;
 
@@ -66,6 +63,7 @@ void setup() {
   Serial.println("# Expected baseline: ~385 ADC counts (1.88V)");
   Serial.println("# Expected peak: ~607 ADC counts (2.96V)");
   Serial.println("# GPIO: Pin 6 (START), Pin 5 (ACTIVE) - 5V output");
+  Serial.println("# Commands: PIN6_HIGH, PIN6_LOW, PIN5_HIGH, PIN5_LOW, RESET_GPIO, STATUS");
   Serial.println("# CALIBRATING...");
 }
 
@@ -188,7 +186,6 @@ void loop() {
   }
 }
 
-
 void handleGPIOCommands() {
   // Read serial commands from Pi
   while (Serial.available()) {
@@ -245,6 +242,9 @@ void processGPIOCommand(String command) {
 // SICK 10 Bar PBT Sensor:
 //   Signal Out ──── 100kΩ ──── Arduino A0
 //   Ground     ──────────────── Arduino GND
+// Arcade Motherboard:
+//   Pin 6 (START) ──────────── Arduino Pin 6
+//   Pin 5 (ACTIVE) ─────────── Arduino Pin 5
 //
 // The 100kΩ resistor provides input impedance.
 // SICK sensor output is already in good voltage range (1.88V - 2.96V)
@@ -252,6 +252,7 @@ void processGPIOCommand(String command) {
 // Expected output from this code:
 // - During calibration: Finds baseline (~385 ADC)
 // - During operation: Re-centers to 512 for Pi compatibility
+// - GPIO control: Responds to Pi commands for arcade control
 // - Diagnostics: Shows raw min/max values every 5s
 //
 // This code is 100% compatible with your existing app_combined.py!
