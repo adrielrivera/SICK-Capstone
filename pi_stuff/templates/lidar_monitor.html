@@ -276,33 +276,15 @@
                 </div>
             </div>
             
-            <!-- Sensor Status Grid -->
+            <!-- LiDAR Detection Status -->
             <div class="sensor-grid">
-                <div class="sensor-card clear" id="tim100Card">
+                <div class="sensor-card clear" id="lidarCard">
                     <div class="sensor-title">
-                        <span class="sensor-icon">📡</span>
-                        TiM100 Sensor
+                        <span class="sensor-icon">🛡️</span>
+                        LiDAR Safety System
                     </div>
-                    <div class="sensor-status" id="tim100Status">CLEAR</div>
-                    <div class="sensor-location">Left Side Detection</div>
-                </div>
-                
-                <div class="sensor-card clear" id="tim150Card">
-                    <div class="sensor-title">
-                        <span class="sensor-icon">📡</span>
-                        TiM150 Sensor
-                    </div>
-                    <div class="sensor-status" id="tim150Status">CLEAR</div>
-                    <div class="sensor-location">Right Side Detection</div>
-                </div>
-                
-                <div class="sensor-card clear" id="tim240Card">
-                    <div class="sensor-title">
-                        <span class="sensor-icon">📡</span>
-                        TiM240 Sensor
-                    </div>
-                    <div class="sensor-status" id="tim240Status">CLEAR</div>
-                    <div class="sensor-location">Rear Detection</div>
+                    <div class="sensor-status" id="lidarStatus">AREA CLEAR</div>
+                    <div class="sensor-location">TiM100 + TiM150 + TiM240</div>
                 </div>
             </div>
             
@@ -310,9 +292,8 @@
             <div class="control-panel">
                 <div class="control-title">System Controls</div>
                 <div class="button-grid">
-                    <button class="btn btn-test" onclick="testSensor('tim100')">Test TiM100</button>
-                    <button class="btn btn-test" onclick="testSensor('tim150')">Test TiM150</button>
-                    <button class="btn btn-test" onclick="testSensor('tim240')">Test TiM240</button>
+                    <button class="btn btn-test" onclick="testDetection()">Test Detection</button>
+                    <button class="btn btn-test" onclick="testClear()">Test Clear</button>
                     <button class="btn btn-reset" onclick="resetAlarm()">Reset Alarm</button>
                 </div>
             </div>
@@ -334,6 +315,7 @@
         // Status variables
         let systemConnected = false;
         let alarmActive = false;
+        let personDetected = false;
         let logEntries = [];
         
         // DOM elements
@@ -342,18 +324,9 @@
         const alarmStatus = document.getElementById('alarmStatus');
         const logContainer = document.getElementById('logContainer');
         
-        // Sensor cards
-        const sensorCards = {
-            tim100: document.getElementById('tim100Card'),
-            tim150: document.getElementById('tim150Card'),
-            tim240: document.getElementById('tim240Card')
-        };
-        
-        const sensorStatuses = {
-            tim100: document.getElementById('tim100Status'),
-            tim150: document.getElementById('tim150Status'),
-            tim240: document.getElementById('tim240Status')
-        };
+        // LiDAR card
+        const lidarCard = document.getElementById('lidarCard');
+        const lidarStatus = document.getElementById('lidarStatus');
         
         // WebSocket event handlers
         socket.on('connect', function() {
@@ -392,10 +365,17 @@
         
         // Update system status
         function updateSystemStatus(data) {
-            // Update sensor statuses
-            updateSensorStatus('tim100', data.tim100_detected);
-            updateSensorStatus('tim150', data.tim150_detected);
-            updateSensorStatus('tim240', data.tim240_detected);
+            // Update person detection status
+            if (data.person_detected !== personDetected) {
+                personDetected = data.person_detected;
+                updateLidarStatus();
+                
+                if (personDetected) {
+                    addLogEntry('🚨 PERSON DETECTED - Any LiDAR sensor', 'detection');
+                } else {
+                    addLogEntry('✅ Area clear - No person detected', 'clear');
+                }
+            }
             
             // Update alarm status
             if (data.alarm_active !== alarmActive) {
@@ -408,28 +388,16 @@
                     addLogEntry('🔇 Alarm deactivated', 'clear');
                 }
             }
-            
-            // Log detection changes
-            if (data.any_detection) {
-                const sensors = [];
-                if (data.tim100_detected) sensors.push('TiM100');
-                if (data.tim150_detected) sensors.push('TiM150');
-                if (data.tim240_detected) sensors.push('TiM240');
-                addLogEntry(`Person detected by: ${sensors.join(', ')}`, 'detection');
-            }
         }
         
-        // Update individual sensor status
-        function updateSensorStatus(sensor, detected) {
-            const card = sensorCards[sensor];
-            const status = sensorStatuses[sensor];
-            
-            if (detected) {
-                card.className = 'sensor-card detected';
-                status.textContent = 'DETECTED';
+        // Update LiDAR status
+        function updateLidarStatus() {
+            if (personDetected) {
+                lidarCard.className = 'sensor-card detected';
+                lidarStatus.textContent = 'PERSON DETECTED';
             } else {
-                card.className = 'sensor-card clear';
-                status.textContent = 'CLEAR';
+                lidarCard.className = 'sensor-card clear';
+                lidarStatus.textContent = 'AREA CLEAR';
             }
         }
         
@@ -460,10 +428,15 @@
             }
         }
         
-        // Test sensor functions
-        function testSensor(sensor) {
-            console.log(`Testing ${sensor}`);
-            socket.emit(`test_${sensor}`);
+        // Test functions
+        function testDetection() {
+            console.log('Testing LiDAR detection');
+            socket.emit('test_detection');
+        }
+        
+        function testClear() {
+            console.log('Testing LiDAR clear');
+            socket.emit('test_clear');
         }
         
         function resetAlarm() {

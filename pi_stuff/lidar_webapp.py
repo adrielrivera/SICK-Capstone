@@ -14,12 +14,9 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'lidar_detection_secret_key'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
-# Global status
+# Global status (simplified - only knows if ANY LiDAR is detecting)
 lidar_status = {
-    'tim100_detected': False,
-    'tim150_detected': False,
-    'tim240_detected': False,
-    'any_detection': False,
+    'person_detected': False,
     'alarm_active': False,
     'system_connected': False
 }
@@ -39,8 +36,8 @@ def status_callback(status):
     socketio.emit('lidar_status', lidar_status)
     
     # Log significant changes
-    if status.get('any_detection'):
-        print(f"🚨 PERSON DETECTED - TiM100: {status.get('tim100_detected')}, TiM150: {status.get('tim150_detected')}, TiM240: {status.get('tim240_detected')}")
+    if status.get('person_detected'):
+        print("🚨 PERSON DETECTED - Any LiDAR sensor")
     elif status.get('alarm_active'):
         print("🔊 Alarm is active")
 
@@ -65,25 +62,33 @@ def handle_status_request():
     """Send current status to client."""
     emit('lidar_status', lidar_status)
 
-@socketio.on('test_tim100')
-def handle_test_tim100():
-    """Test TiM100 detection (simulate)."""
-    print("🧪 Testing TiM100 detection")
-    # This would send a test signal to the Arduino
-    # For now, just log it
-    emit('test_result', {'sensor': 'TiM100', 'status': 'Test signal sent'})
+@socketio.on('test_detection')
+def handle_test_detection():
+    """Test LiDAR detection (simulate)."""
+    print("🧪 Testing LiDAR detection")
+    # Send test command to Arduino
+    if lidar_system and lidar_system.arduino:
+        try:
+            lidar_system.arduino.write(b"SIMULATE_DETECTION\n")
+            emit('test_result', {'action': 'detection', 'status': 'Test signal sent'})
+        except Exception as e:
+            emit('test_result', {'action': 'detection', 'status': f'Error: {e}'})
+    else:
+        emit('test_result', {'action': 'detection', 'status': 'Arduino not connected'})
 
-@socketio.on('test_tim150')
-def handle_test_tim150():
-    """Test TiM150 detection (simulate)."""
-    print("🧪 Testing TiM150 detection")
-    emit('test_result', {'sensor': 'TiM150', 'status': 'Test signal sent'})
-
-@socketio.on('test_tim240')
-def handle_test_tim240():
-    """Test TiM240 detection (simulate)."""
-    print("🧪 Testing TiM240 detection")
-    emit('test_result', {'sensor': 'TiM240', 'status': 'Test signal sent'})
+@socketio.on('test_clear')
+def handle_test_clear():
+    """Test LiDAR clear (simulate)."""
+    print("🧪 Testing LiDAR clear")
+    # Send test command to Arduino
+    if lidar_system and lidar_system.arduino:
+        try:
+            lidar_system.arduino.write(b"SIMULATE_CLEAR\n")
+            emit('test_result', {'action': 'clear', 'status': 'Test signal sent'})
+        except Exception as e:
+            emit('test_result', {'action': 'clear', 'status': f'Error: {e}'})
+    else:
+        emit('test_result', {'action': 'clear', 'status': 'Arduino not connected'})
 
 @socketio.on('reset_alarm')
 def handle_reset_alarm():
