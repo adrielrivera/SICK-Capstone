@@ -1,18 +1,33 @@
-(venv) sick7@raspberrypi:~/SICK/SICK-Capstone/pi_stuff $ python3 tim240_run.py
+(venv) sick7@raspberrypi:~/SICK/SICK-Capstone/pi_stuff $ sudo python3 tim240_run.py
+✅ GPIO initialized successfully
+============================================================
+SICK7 - TiM240 Kite-Shaped Safety Field
+============================================================
+Kite-shaped detection field:
+  Field range: ±20.0715°
+  LiDAR height: 280.0cm, down angle: 41.8°
+  Safe distances (actual beam distances):
+      0°:  375.1cm beam (shadow:  250.0cm)
+     10°:  347.4cm beam (shadow:  231.5cm)
+     15°:  333.5cm beam (shadow:  222.3cm)
+     20°:  319.7cm beam (shadow:  213.1cm)
+    -10°:  347.4cm beam (shadow:  231.5cm)
+    -15°:  333.5cm beam (shadow:  222.3cm)
+    -20°:  319.7cm beam (shadow:  213.1cm)
+  Hammer threshold: 100.0cm actual beam distance
+
+GPIO Detection Output: Pin 18 (3.3V when person detected)
+Arduino connected on /dev/ttyUSB0 @ 115200 baud
+Connecting to TiM240 at 192.168.0.20:2111
 Traceback (most recent call last):
-  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 495, in <module>
+  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 510, in <module>
     main()
     ~~~~^^
-  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 332, in main
-    GPIO.setup(DETECTION_GPIO_PIN, GPIO.OUT)
-    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-RuntimeError: Cannot determine SOC peripheral base address
-(venv) sick7@raspberrypi:~/SICK/SICK-Capstone/pi_stuff $ python3 tim240_run.py
-Traceback (most recent call last):
-  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 495, in <module>
-    main()
-    ~~~~^^
-  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 332, in main
-    GPIO.setup(DETECTION_GPIO_PIN, GPIO.OUT)
-    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-RuntimeError: Cannot determine SOC peripheral base address
+  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 360, in main
+    s = socket.create_connection((HOST, PORT), timeout=3)
+  File "/usr/lib/python3.13/socket.py", line 864, in create_connection
+    raise exceptions[0]
+  File "/usr/lib/python3.13/socket.py", line 849, in create_connection
+    sock.connect(sa)
+    ~~~~~~~~~~~~^^^^
+TimeoutError: timed out
