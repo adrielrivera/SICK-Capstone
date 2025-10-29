@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import socket, time, math, serial
+import RPi.GPIO as GPIO
 
 # ---- Multi-LiDAR Safety System ----
 # TiM240: Ethernet -> Pi (rear detection)
@@ -9,6 +10,9 @@ import socket, time, math, serial
 tim100_detected = False
 tim150_detected = False
 last_tim1xx_update = 0
+
+# GPIO pin for person detection output (3.3V)
+DETECTION_GPIO_PIN = 18  # GPIO18 (Pin 12)
 
 # --- Kite-shaped field detection system ---
 # No longer using the old single-point detector
@@ -323,11 +327,17 @@ def get_combined_safety_status(state):
         }
 
 def main():
+    # Initialize GPIO
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(DETECTION_GPIO_PIN, GPIO.OUT)
+    GPIO.output(DETECTION_GPIO_PIN, GPIO.LOW)  # Start with no detection
+    
     # Initialize kite field detection system
     print("=" * 60)
     print("SICK7 - TiM240 Kite-Shaped Safety Field")
     print("=" * 60)
     print_kite_field_info()
+    print(f"GPIO Detection Output: Pin {DETECTION_GPIO_PIN} (3.3V when person detected)")
 
     # Initialize Arduino connection
     arduino_connected = init_arduino_connection()
@@ -406,8 +416,12 @@ def main():
                     state = out.get("state")
                     violations = out.get("violations", [])
                     
+                    # Control GPIO based on person detection
+                    person_detected = (state == "ALERT_REAR")
+                    GPIO.output(DETECTION_GPIO_PIN, GPIO.HIGH if person_detected else GPIO.LOW)
+                    
                     if now_ms - last_print >= 2000:
-                        print(f"{time.strftime('%H:%M:%S')}  state={state}  violations={len(violations)}")
+                        print(f"{time.strftime('%H:%M:%S')}  state={state}  violations={len(violations)}  GPIO={'HIGH' if person_detected else 'LOW'}")
                         if violations:
                             for v in violations[:3]:  # Show first 3 violations
                                 print(f"  {v['type']}: {v['angle']:.1f}° at {v['distance']:.3f}m (safe: {v['safe_distance']:.3f}m)")
@@ -471,6 +485,11 @@ def main():
                 print("Arduino connection closed")
             except Exception:
                 pass
+        
+        # Cleanup GPIO
+        GPIO.output(DETECTION_GPIO_PIN, GPIO.LOW)
+        GPIO.cleanup()
+        print("GPIO cleaned up")
 
 if __name__ == "__main__":
     main()
