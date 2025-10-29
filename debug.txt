@@ -1,0 +1,39 @@
+(venv) sick7@raspberrypi:~/SICK/SICK-Capstone/pi_stuff $ python3 tim240_run.py
+============================================================
+SICK7 - TiM240 Kite-Shaped Safety Field
+============================================================
+Kite-shaped detection field:
+  Field range: ±20.0715°
+  LiDAR height: 280.0cm, down angle: 41.8°
+  Safe distances (actual beam distances):
+      0°:  375.1cm beam (shadow:  250.0cm)
+     10°:  347.4cm beam (shadow:  231.5cm)
+     15°:  333.5cm beam (shadow:  222.3cm)
+     20°:  319.7cm beam (shadow:  213.1cm)
+    -10°:  347.4cm beam (shadow:  231.5cm)
+    -15°:  333.5cm beam (shadow:  222.3cm)
+    -20°:  319.7cm beam (shadow:  213.1cm)
+  Hammer threshold: 100.0cm actual beam distance
+
+Arduino connected on /dev/ttyUSB0 @ 115200 baud
+Connecting to TiM240 at 192.168.0.20:2111
+Ident: sRA DeviceIdent 6 TiM240 8 1.0.5.0R
+Enabling stream...
+06:02:33  kite_field_points=41
+  closest: -19.0° at 3.682m
+06:02:33  state=SAFE  violations=0
+06:02:33  state=SAFE  violations=0
+
+Disabling stream and closing...
+Arduino connection closed
+Traceback (most recent call last):
+  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 476, in <module>
+    main()
+    ~~~~^^
+  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 441, in main
+    safety_status, safety_info = get_combined_safety_status()
+                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 302, in get_combined_safety_status
+    tim240_alert = (state == "ALERT_REAR")
+                    ^^^^^
+NameError: name 'state' is not defined
