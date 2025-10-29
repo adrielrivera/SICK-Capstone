@@ -1,48 +1,18 @@
-(venv) sick7@raspberrypi:~/SICK/SICK-Capstone/pi_stuff $ ./start_lidar_system.sh 
-==========================================
-LiDAR Detection System Startup
-==========================================
-Checking dependencies...
-Checking Arduino connection...
-Checking TiM240 connection...
-✅ TiM240 is reachable
-Starting LiDAR Detection System...
-Web interface: http://localhost:5001
-Press Ctrl+C to stop
-==========================================
-============================================================
-LiDAR Detection Webapp
-============================================================
-Starting LiDAR detection system...
-🚀 Starting LiDAR Detection System...
-✅ Connected to LiDAR Arduino at /dev/ttyUSB1
-✅ Connected to TiM240 at 192.168.0.20:2111
-Starting TiM240 reader thread...
-Starting Arduino reader thread...
-✅ LiDAR Detection System started
-✅ LiDAR detection system started
-Starting web server...
-Web interface: http://localhost:5001
-Press Ctrl+C to stop
-============================================================
- * Serving Flask app 'lidar_webapp'
- * Debug mode: off
-WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
- * Running on all addresses (0.0.0.0)
- * Running on http://127.0.0.1:5001
- * Running on http://172.22.145.161:5001
-Press CTRL+C to quit
-Error reading from TiM240: timed out
-Error reading from TiM240: timed out
-172.22.145.161 - - [29/Oct/2025 06:45:40] "GET / HTTP/1.1" 200 -
-172.22.145.161 - - [29/Oct/2025 06:45:40] "GET /socket.io/?EIO=4&transport=polling&t=Pekjn1U HTTP/1.1" 200 -
-Client connected to LiDAR webapp
-172.22.145.161 - - [29/Oct/2025 06:45:40] "POST /socket.io/?EIO=4&transport=polling&t=Pekjn2-&sid=QawXge6Hk3aSQO6vAAAA HTTP/1.1" 200 -
-172.22.145.161 - - [29/Oct/2025 06:45:40] "GET /socket.io/?EIO=4&transport=polling&t=Pekjn30&sid=QawXge6Hk3aSQO6vAAAA HTTP/1.1" 200 -
-172.22.145.161 - - [29/Oct/2025 06:45:40] "POST /socket.io/?EIO=4&transport=polling&t=Pekjn4C&sid=QawXge6Hk3aSQO6vAAAA HTTP/1.1" 200 -
-172.22.145.161 - - [29/Oct/2025 06:45:40] "GET /socket.io/?EIO=4&transport=polling&t=Pekjn4D&sid=QawXge6Hk3aSQO6vAAAA HTTP/1.1" 200 -
-Error reading from TiM240: timed out
-Error reading from TiM240: timed out
-Error reading from TiM240: timed out
-Error reading from TiM240: timed out
-Error reading from TiM240: timed out
+(venv) sick7@raspberrypi:~/SICK/SICK-Capstone/pi_stuff $ python3 tim240_run.py
+Traceback (most recent call last):
+  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 495, in <module>
+    main()
+    ~~~~^^
+  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 332, in main
+    GPIO.setup(DETECTION_GPIO_PIN, GPIO.OUT)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Cannot determine SOC peripheral base address
+(venv) sick7@raspberrypi:~/SICK/SICK-Capstone/pi_stuff $ python3 tim240_run.py
+Traceback (most recent call last):
+  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 495, in <module>
+    main()
+    ~~~~^^
+  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 332, in main
+    GPIO.setup(DETECTION_GPIO_PIN, GPIO.OUT)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Cannot determine SOC peripheral base address
