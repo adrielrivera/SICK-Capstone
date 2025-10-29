@@ -38,7 +38,7 @@ void setup() {
   Serial.println("# LiDAR Detection System - Arduino Ready");
   Serial.println("# OR Gate Input: Pin 8 (TiM100 OR TiM150 OR TiM240)");
   Serial.println("# Alarm: Buzzer Pin 9, LED Pin 13");
-  Serial.println("# Commands: STATUS, RESET_ALARM");
+  Serial.println("# Commands: STATUS, RESET_ALARM, SIMULATE_DETECTION, SIMULATE_CLEAR");
   Serial.println("# READY");
   
   // Blink LED to indicate ready
@@ -131,16 +131,19 @@ void processCommand(String command) {
   else if (command == "RESET_ALARM") {
     alarmActive = false;
     noTone(BUZZER_PIN);
-    digitalWrite(ALARM_LED_PIN, LOW);
+    digitalWrite(LED_PIN, LOW);
     Serial.println("# Alarm reset manually");
   }
-  else if (command == "TIM240_HIGH") {
-    digitalWrite(TIM240_PIN, HIGH);
-    Serial.println("# TiM240 signal set HIGH (simulated detection)");
+  else if (command == "SIMULATE_DETECTION") {
+    // Simulate detection for testing
+    person_detected = true;
+    triggerAlarm();
+    Serial.println("# Simulated detection triggered");
   }
-  else if (command == "TIM240_LOW") {
-    digitalWrite(TIM240_PIN, LOW);
-    Serial.println("# TiM240 signal set LOW (simulated clear)");
+  else if (command == "SIMULATE_CLEAR") {
+    // Simulate clear for testing
+    person_detected = false;
+    Serial.println("# Simulated clear triggered");
   }
   else {
     Serial.print("# Unknown command: ");
