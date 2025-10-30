@@ -87,7 +87,6 @@ void loop() {
   runAlarmSystem();
   
   // Send status to Pi every second
-  unsigned long now = millis();
   if (now - lastStatusReport >= statusInterval) {
     sendStatusToPi();
     lastStatusReport = now;
