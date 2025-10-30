@@ -15,6 +15,12 @@ unsigned long alarmStartTime = 0;
 bool alarmActive = false;
 const unsigned long alarmDuration = 5000; // 5 seconds
 
+// Input debounce/hysteresis (software only)
+const unsigned long debounceMs = 50;   // Require stable level for 50 ms
+int stableLevel = LOW;                 // Idle is LOW (0.4 V)
+int candidateLevel = LOW;              // Last observed level
+unsigned long lastToggleMs = 0;        // Time when candidate changed
+
 // Serial communication with Pi
 String serialCommand = "";
 bool commandReady = false;
@@ -51,21 +57,30 @@ void setup() {
 }
 
 void loop() {
-  int state = digitalRead(INPUT_PIN);
+  int rawLevel = digitalRead(INPUT_PIN);
+  unsigned long now = millis();
   
   // Handle serial commands from Pi
   handleSerialCommands();
   
-  // Check for person detection (HIGH = person detected)
-  bool currentDetection = (state == HIGH);
+  // Debounce: track candidate level and accept only if stable for debounceMs
+  if (rawLevel != candidateLevel) {
+    candidateLevel = rawLevel;
+    lastToggleMs = now;
+  }
   
-  // Trigger alarm if detection starts
-  if (currentDetection && !person_detected) {
-    person_detected = true;
-    triggerAlarm();
-  } else if (!currentDetection && person_detected) {
-    person_detected = false;
-    Serial.println("✅ Area clear - Person left");
+  if ((now - lastToggleMs) >= debounceMs && stableLevel != candidateLevel) {
+    stableLevel = candidateLevel;
+    bool currentDetection = (stableLevel == HIGH);  // HIGH = person detected
+    
+    // Edge actions on debounced signal
+    if (currentDetection && !person_detected) {
+      person_detected = true;
+      triggerAlarm();
+    } else if (!currentDetection && person_detected) {
+      person_detected = false;
+      Serial.println("✅ Area clear - Person left");
+    }
   }
   
   // Run alarm system (exactly like your working code)
