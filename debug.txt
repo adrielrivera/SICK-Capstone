@@ -1,33 +1,18 @@
-(venv) sick7@raspberrypi:~/SICK/SICK-Capstone/pi_stuff $ sudo python3 tim240_run.py
-✅ GPIO initialized successfully
-============================================================
-SICK7 - TiM240 Kite-Shaped Safety Field
-============================================================
-Kite-shaped detection field:
-  Field range: ±20.0715°
-  LiDAR height: 280.0cm, down angle: 41.8°
-  Safe distances (actual beam distances):
-      0°:  375.1cm beam (shadow:  250.0cm)
-     10°:  347.4cm beam (shadow:  231.5cm)
-     15°:  333.5cm beam (shadow:  222.3cm)
-     20°:  319.7cm beam (shadow:  213.1cm)
-    -10°:  347.4cm beam (shadow:  231.5cm)
-    -15°:  333.5cm beam (shadow:  222.3cm)
-    -20°:  319.7cm beam (shadow:  213.1cm)
-  Hammer threshold: 100.0cm actual beam distance
+(venv) sick7@raspberrypi:~/SICK/SICK-Capstone/arduino_stuff/lidar_detection $ ./upload.sh
+==========================================
+LiDAR Detection Arduino Upload Script
+==========================================
+Found Arduino at: /dev/ttyUSB1
+Compiling and uploading lidar_detection.ino...
+/home/sick7/SICK/SICK-Capstone/arduino_stuff/lidar_detection/lidar_detection.ino: In function 'void loop()':
+/home/sick7/SICK/SICK-Capstone/arduino_stuff/lidar_detection/lidar_detection.ino:90:17: error: redeclaration of 'long unsigned int now'
+   unsigned long now = millis();
+                 ^~~
+/home/sick7/SICK/SICK-Capstone/arduino_stuff/lidar_detection/lidar_detection.ino:61:17: note: 'long unsigned int now' previously declared here
+   unsigned long now = millis();
+                 ^~~
 
-GPIO Detection Output: Pin 18 (3.3V when person detected)
-Arduino connected on /dev/ttyUSB0 @ 115200 baud
-Connecting to TiM240 at 192.168.0.20:2111
-Traceback (most recent call last):
-  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 510, in <module>
-    main()
-    ~~~~^^
-  File "/home/sick7/SICK/SICK-Capstone/pi_stuff/tim240_run.py", line 360, in main
-    s = socket.create_connection((HOST, PORT), timeout=3)
-  File "/usr/lib/python3.13/socket.py", line 864, in create_connection
-    raise exceptions[0]
-  File "/usr/lib/python3.13/socket.py", line 849, in create_connection
-    sock.connect(sa)
-    ~~~~~~~~~~~~^^^^
-TimeoutError: timed out
+Used platform Version Path
+arduino:avr   1.8.6   /home/sick7/.arduino15/packages/arduino/hardware/avr/1.8.6
+Error during build: exit status 1
+ERROR: Arduino compilation failed.
