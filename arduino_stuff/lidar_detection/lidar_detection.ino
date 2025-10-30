@@ -3,7 +3,7 @@
 // Activates alarm circuit when ANY LiDAR detects a person
 // Sends status back to Pi for webapp display
 
-const int INPUT_PIN = 8;      // OR gate input (TiM100 OR TiM150 OR TiM240)
+const int INPUT_PIN = 4;      // OR gate input (TiM100 OR TiM150 OR TiM240)
 const int BUZZER_PIN = 9;     // Piezo buzzer
 const int LED_PIN = 13;       // Status LED
 
@@ -36,7 +36,7 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   
   Serial.println("# LiDAR Detection System - Arduino Ready");
-  Serial.println("# OR Gate Input: Pin 8 (TiM100 OR TiM150 OR TiM240)");
+  Serial.println("# OR Gate Input: Pin 4 (TiM100 OR TiM150 OR TiM240)");
   Serial.println("# Alarm: Buzzer Pin 9, LED Pin 13");
   Serial.println("# Commands: STATUS, RESET_ALARM, SIMULATE_DETECTION, SIMULATE_CLEAR");
   Serial.println("# READY");
@@ -160,7 +160,7 @@ void sendStatusToPi() {
 }
 
 // Hardware Connections:
-// OR Gate Output → Pin 8 (with pull-down resistor)
+// OR Gate Output → Pin 4 (with pull-down resistor)
 //   - TiM100 Signal → OR Gate Input 1
 //   - TiM150 Signal → OR Gate Input 2  
 //   - TiM240 Signal → OR Gate Input 3 (from Pi via GPIO)
