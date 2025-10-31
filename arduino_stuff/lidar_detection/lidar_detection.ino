@@ -21,6 +21,8 @@ int stableLevel = LOW;                 // Idle is LOW (0.4 V)
 int candidateLevel = LOW;              // Last observed level
 unsigned long lastToggleMs = 0;        // Time when candidate changed
 unsigned long lastHighMs = 0;          // Time when pin was last HIGH (for force clear)
+unsigned long continuousLowStartMs = 0; // When pin started being continuously LOW
+bool wasLowLastCycle = false;          // Track if pin was LOW last loop
 
 // Serial communication with Pi
 String serialCommand = "";
@@ -42,6 +44,13 @@ void setup() {
   noTone(BUZZER_PIN);
   digitalWrite(LED_PIN, LOW);
   lastHighMs = millis();  // Initialize to current time (pin starts LOW)
+  
+  // Initialize pin state tracking based on actual pin reading
+  int initialPinState = digitalRead(INPUT_PIN);
+  wasLowLastCycle = (initialPinState == LOW);
+  if (wasLowLastCycle) {
+    continuousLowStartMs = millis();  // Pin starts LOW
+  }
   
   Serial.println("# LiDAR Detection System - Arduino Ready");
   Serial.println("# OR Gate Input: Pin 4 (TiM100 OR TiM150 OR TiM240)");
@@ -68,6 +77,21 @@ void loop() {
   // Track when pin was last HIGH (for robust force clear)
   if (rawLevel == HIGH) {
     lastHighMs = now;
+    continuousLowStartMs = 0;  // Reset continuous LOW timer
+    wasLowLastCycle = false;
+  }
+  
+  // Track continuous LOW state (for force clear)
+  if (rawLevel == LOW) {
+    if (!wasLowLastCycle) {
+      // Pin just went LOW - start timer
+      continuousLowStartMs = now;
+      wasLowLastCycle = true;
+    }
+  } else {
+    // Pin is HIGH - reset tracking
+    wasLowLastCycle = false;
+    continuousLowStartMs = 0;
   }
   
   // Debounce: track candidate level and accept only if stable for debounceMs
@@ -101,21 +125,35 @@ void loop() {
     }
   }
   
-  // Additional safety: If pin has been LOW for extended period since last HIGH, force clear
+  // Additional safety: If pin has been continuously LOW for extended period, force clear
   // Check rawLevel (actual pin state) not stableLevel (debounced state)
   // This ensures clean state even if debounce logic missed the transition
-  // Use lastHighMs to handle cases where pin bounces but overall has been LOW
-  if (rawLevel == LOW && person_detected && (now - lastHighMs) > 500) {
-    // Force clear regardless of debounce state - pin has been LOW for 500ms since last HIGH
+  // Use continuousLowStartMs to track when pin started being continuously LOW
+  if (rawLevel == LOW && person_detected && continuousLowStartMs > 0 && (now - continuousLowStartMs) > 200) {
+    // Force clear regardless of debounce state - pin has been continuously LOW for 200ms
     person_detected = false;
     stableLevel = LOW;      // Sync debounce state to match reality
     candidateLevel = LOW;   // Sync candidate to match reality
+    continuousLowStartMs = 0;  // Reset timer
+    wasLowLastCycle = false;
     if (alarmActive) {
       alarmActive = false;
       noTone(BUZZER_PIN);
       digitalWrite(LED_PIN, LOW);
     }
-    Serial.println("✅ Area clear - Forced by extended LOW");
+    Serial.println("✅ Area clear - Forced by continuous LOW");
+    sendStatusToPi();
+  }
+  
+  // Extra safety: If alarm finished and pin is LOW, immediately clear (no delay)
+  // This handles the case where alarm completes but person_detected wasn't cleared
+  if (!alarmActive && rawLevel == LOW && person_detected) {
+    person_detected = false;
+    stableLevel = LOW;
+    candidateLevel = LOW;
+    continuousLowStartMs = 0;
+    wasLowLastCycle = false;
+    Serial.println("✅ Area clear - Alarm finished, pin LOW");
     sendStatusToPi();
   }
   
