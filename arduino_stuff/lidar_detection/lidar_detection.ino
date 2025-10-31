@@ -20,6 +20,7 @@ const unsigned long debounceMs = 50;   // Require stable level for 50 ms
 int stableLevel = LOW;                 // Idle is LOW (0.4 V)
 int candidateLevel = LOW;              // Last observed level
 unsigned long lastToggleMs = 0;        // Time when candidate changed
+unsigned long lastHighMs = 0;          // Time when pin was last HIGH (for force clear)
 
 // Serial communication with Pi
 String serialCommand = "";
@@ -40,6 +41,7 @@ void setup() {
   // Initialize states
   noTone(BUZZER_PIN);
   digitalWrite(LED_PIN, LOW);
+  lastHighMs = millis();  // Initialize to current time (pin starts LOW)
   
   Serial.println("# LiDAR Detection System - Arduino Ready");
   Serial.println("# OR Gate Input: Pin 4 (TiM100 OR TiM150 OR TiM240)");
@@ -62,6 +64,11 @@ void loop() {
   
   // Handle serial commands from Pi
   handleSerialCommands();
+  
+  // Track when pin was last HIGH (for robust force clear)
+  if (rawLevel == HIGH) {
+    lastHighMs = now;
+  }
   
   // Debounce: track candidate level and accept only if stable for debounceMs
   if (rawLevel != candidateLevel) {
@@ -94,10 +101,15 @@ void loop() {
     }
   }
   
-  // Additional safety: If pin is LOW for extended period, force clear
-  // This ensures clean state even if edge detection missed something
-  if (stableLevel == LOW && person_detected && (now - lastToggleMs) > 200) {
+  // Additional safety: If pin has been LOW for extended period since last HIGH, force clear
+  // Check rawLevel (actual pin state) not stableLevel (debounced state)
+  // This ensures clean state even if debounce logic missed the transition
+  // Use lastHighMs to handle cases where pin bounces but overall has been LOW
+  if (rawLevel == LOW && person_detected && (now - lastHighMs) > 500) {
+    // Force clear regardless of debounce state - pin has been LOW for 500ms since last HIGH
     person_detected = false;
+    stableLevel = LOW;      // Sync debounce state to match reality
+    candidateLevel = LOW;   // Sync candidate to match reality
     if (alarmActive) {
       alarmActive = false;
       noTone(BUZZER_PIN);
