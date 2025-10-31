@@ -77,10 +77,34 @@ void loop() {
     if (currentDetection && !person_detected) {
       person_detected = true;
       triggerAlarm();
+      // Immediately send status on detection
+      sendStatusToPi();
     } else if (!currentDetection && person_detected) {
+      // Person left - force clear state
       person_detected = false;
+      // Ensure alarm is stopped (clean state)
+      if (alarmActive) {
+        alarmActive = false;
+        noTone(BUZZER_PIN);
+        digitalWrite(LED_PIN, LOW);
+      }
       Serial.println("✅ Area clear - Person left");
+      // Immediately send status on clear
+      sendStatusToPi();
     }
+  }
+  
+  // Additional safety: If pin is LOW for extended period, force clear
+  // This ensures clean state even if edge detection missed something
+  if (stableLevel == LOW && person_detected && (now - lastToggleMs) > 200) {
+    person_detected = false;
+    if (alarmActive) {
+      alarmActive = false;
+      noTone(BUZZER_PIN);
+      digitalWrite(LED_PIN, LOW);
+    }
+    Serial.println("✅ Area clear - Forced by extended LOW");
+    sendStatusToPi();
   }
   
   // Run alarm system (exactly like your working code)
