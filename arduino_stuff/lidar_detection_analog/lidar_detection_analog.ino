@@ -1,6 +1,6 @@
-// LiDAR Detection System - Second Arduino (Analog Input Version)
+// LiDAR Detection System - Second Arduino (Analog Input Version with Hysteresis)
 // Monitors OR gate input from TiM100, TiM150, and TiM240 detection circuit
-// Uses ANALOG INPUT to detect 1.0V signals (TiM240 GPIO output via OR gate)
+// Uses ANALOG INPUT with HYSTERESIS to reliably detect 0.8V signals while filtering noise
 // Activates alarm circuit when ANY LiDAR detects a person
 // Sends status back to Pi for webapp display
 
@@ -8,11 +8,12 @@ const int INPUT_PIN = A0;           // Analog input (TiM100 OR TiM150 OR TiM240)
 const int BUZZER_PIN = 9;           // Piezo buzzer
 const int LED_PIN = 13;              // Status LED
 
-// Analog voltage threshold (1.0V detection)
+// Analog voltage thresholds with hysteresis
 // Arduino ADC: 0-1023 for 0-5V
-// 1.0V = (1.0/5.0) * 1023 ≈ 205 ADC counts
-// Using 205 for reliable detection with some margin
-const int VOLTAGE_THRESHOLD = 205;  // ~1.0V threshold
+// Hysteresis prevents false triggers from noise while allowing TiM240's 0.8V to trigger
+const int THRESHOLD_HIGH = 184;  // ~0.9V - activate detection (prevents noise false triggers)
+const int THRESHOLD_LOW = 143;   // ~0.7V - deactivate detection (allows TiM240 0.8V to trigger)
+const unsigned long CONFIRMATION_MS = 50;  // Require stable signal for 50ms before triggering
 
 // Detection state
 bool person_detected = false;
@@ -21,6 +22,9 @@ bool person_detected = false;
 unsigned long alarmStartTime = 0;
 bool alarmActive = false;
 const unsigned long alarmDuration = 5000; // 5 seconds
+
+// Time-based confirmation for detection
+unsigned long detectionStartTime = 0;  // When signal first exceeded threshold
 
 // Input debounce/hysteresis (software only)
 const unsigned long debounceMs = 50;   // Require stable level for 50 ms
@@ -54,19 +58,28 @@ void setup() {
   
   // Initialize pin state tracking based on actual analog reading
   int initialVoltage = analogRead(INPUT_PIN);
-  int initialPinState = (initialVoltage > VOLTAGE_THRESHOLD) ? HIGH : LOW;
+  int initialPinState = (initialVoltage > THRESHOLD_HIGH) ? HIGH : LOW;
   wasLowLastCycle = (initialPinState == LOW);
   if (wasLowLastCycle) {
     continuousLowStartMs = millis();  // Pin starts LOW
   }
+  detectionStartTime = 0;  // Initialize detection timer
   
-  Serial.println("# LiDAR Detection System - Arduino Ready (Analog Input)");
+  Serial.println("# LiDAR Detection System - Arduino Ready (Analog Input with Hysteresis)");
   Serial.println("# OR Gate Input: Analog Pin A0 (TiM100 OR TiM150 OR TiM240)");
-  Serial.print("# Voltage Threshold: ");
-  Serial.print(VOLTAGE_THRESHOLD);
+  Serial.print("# Activation Threshold: ");
+  Serial.print(THRESHOLD_HIGH);
   Serial.print(" ADC (");
-  Serial.print((VOLTAGE_THRESHOLD * 5.0 / 1023.0), 2);
-  Serial.println("V)");
+  Serial.print((THRESHOLD_HIGH * 5.0 / 1023.0), 2);
+  Serial.println("V) - prevents noise false triggers");
+  Serial.print("# Deactivation Threshold: ");
+  Serial.print(THRESHOLD_LOW);
+  Serial.print(" ADC (");
+  Serial.print((THRESHOLD_LOW * 5.0 / 1023.0), 2);
+  Serial.println("V) - allows TiM240 0.8V to trigger");
+  Serial.print("# Confirmation Time: ");
+  Serial.print(CONFIRMATION_MS);
+  Serial.println(" ms");
   Serial.println("# Alarm: Buzzer Pin 9, LED Pin 13");
   Serial.println("# Commands: STATUS, RESET_ALARM, SIMULATE_DETECTION, SIMULATE_CLEAR");
   Serial.println("# READY");
@@ -84,14 +97,64 @@ void loop() {
   // Read analog voltage (0-1023 for 0-5V)
   int rawVoltage = analogRead(INPUT_PIN);
   
-  // Convert analog reading to digital level based on threshold
-  // Voltage > 1.0V (threshold) = HIGH = person detected
-  int rawLevel = (rawVoltage > VOLTAGE_THRESHOLD) ? HIGH : LOW;
-  
   unsigned long now = millis();
   
   // Handle serial commands from Pi
   handleSerialCommands();
+  
+  // HYSTERESIS LOGIC WITH TIME-BASED CONFIRMATION
+  // Use different thresholds for activation vs deactivation to prevent false triggers
+  
+  if (!person_detected) {
+    // NOT DETECTING: Require HIGH threshold to activate (prevents noise false triggers)
+    if (rawVoltage > THRESHOLD_HIGH) {
+      // Signal above activation threshold
+      if (detectionStartTime == 0) {
+        // Start timing - signal just crossed threshold
+        detectionStartTime = now;
+      } else if ((now - detectionStartTime) >= CONFIRMATION_MS) {
+        // Confirmed: stable signal above threshold for confirmation time
+        person_detected = true;
+        detectionStartTime = 0;  // Reset timer
+        triggerAlarm();
+        sendStatusToPi();
+        Serial.println("✅ Person detected - Confirmed after stable signal");
+      }
+      // If not confirmed yet, keep waiting (don't reset timer)
+    } else {
+      // Signal dropped below threshold before confirmation
+      detectionStartTime = 0;  // Reset timer
+    }
+  } else {
+    // DETECTING: Use LOW threshold to deactivate (easier to clear, allows TiM240 0.8V to work)
+    if (rawVoltage < THRESHOLD_LOW) {
+      // Signal below deactivation threshold
+      if (detectionStartTime == 0) {
+        // Start timing - signal just dropped below threshold
+        detectionStartTime = now;
+      } else if ((now - detectionStartTime) >= CONFIRMATION_MS) {
+        // Confirmed: stable low signal for confirmation time
+        person_detected = false;
+        detectionStartTime = 0;  // Reset timer
+        // Ensure alarm is stopped (clean state)
+        if (alarmActive) {
+          alarmActive = false;
+          noTone(BUZZER_PIN);
+          digitalWrite(LED_PIN, LOW);
+        }
+        Serial.println("✅ Area clear - Person left (confirmed after stable low signal)");
+        sendStatusToPi();
+      }
+      // If not confirmed yet, keep waiting (don't reset timer)
+    } else {
+      // Signal still above deactivation threshold
+      detectionStartTime = 0;  // Reset timer
+    }
+  }
+  
+  // Convert to digital level for compatibility with existing tracking code
+  // Use HIGH threshold for general tracking purposes
+  int rawLevel = (rawVoltage > THRESHOLD_HIGH) ? HIGH : LOW;
   
   // Track when pin was last HIGH (for robust force clear)
   if (rawLevel == HIGH) {
@@ -113,46 +176,12 @@ void loop() {
     continuousLowStartMs = 0;
   }
   
-  // Debounce: track candidate level and accept only if stable for debounceMs
-  if (rawLevel != candidateLevel) {
-    candidateLevel = rawLevel;
-    lastToggleMs = now;
-  }
-  
-  if ((now - lastToggleMs) >= debounceMs && stableLevel != candidateLevel) {
-    stableLevel = candidateLevel;
-    bool currentDetection = (stableLevel == HIGH);  // HIGH = person detected
-    
-    // Edge actions on debounced signal
-    if (currentDetection && !person_detected) {
-      person_detected = true;
-      triggerAlarm();
-      // Immediately send status on detection
-      sendStatusToPi();
-    } else if (!currentDetection && person_detected) {
-      // Person left - force clear state
-      person_detected = false;
-      // Ensure alarm is stopped (clean state)
-      if (alarmActive) {
-        alarmActive = false;
-        noTone(BUZZER_PIN);
-        digitalWrite(LED_PIN, LOW);
-      }
-      Serial.println("✅ Area clear - Person left");
-      // Immediately send status on clear
-      sendStatusToPi();
-    }
-  }
-  
   // Additional safety: If pin has been continuously LOW for extended period, force clear
-  // Check rawLevel (actual pin state) not stableLevel (debounced state)
-  // This ensures clean state even if debounce logic missed the transition
-  // Use continuousLowStartMs to track when pin started being continuously LOW
-  if (rawLevel == LOW && person_detected && continuousLowStartMs > 0 && (now - continuousLowStartMs) > 200) {
-    // Force clear regardless of debounce state - pin has been continuously LOW for 200ms
+  // This ensures clean state even if hysteresis logic missed the transition
+  if (rawVoltage < THRESHOLD_LOW && person_detected && continuousLowStartMs > 0 && (now - continuousLowStartMs) > 200) {
+    // Force clear regardless of confirmation state - pin has been continuously LOW for 200ms
     person_detected = false;
-    stableLevel = LOW;      // Sync debounce state to match reality
-    candidateLevel = LOW;   // Sync candidate to match reality
+    detectionStartTime = 0;
     continuousLowStartMs = 0;  // Reset timer
     wasLowLastCycle = false;
     if (alarmActive) {
@@ -166,10 +195,9 @@ void loop() {
   
   // Extra safety: If alarm finished and pin is LOW, immediately clear (no delay)
   // This handles the case where alarm completes but person_detected wasn't cleared
-  if (!alarmActive && rawLevel == LOW && person_detected) {
+  if (!alarmActive && rawVoltage < THRESHOLD_LOW && person_detected) {
     person_detected = false;
-    stableLevel = LOW;
-    candidateLevel = LOW;
+    detectionStartTime = 0;
     continuousLowStartMs = 0;
     wasLowLastCycle = false;
     Serial.println("✅ Area clear - Alarm finished, pin LOW");
@@ -299,12 +327,17 @@ void sendStatusToPi() {
 //
 // Expected Behavior:
 // - Monitors OR gate input via analog pin A0
-// - Detects voltage > 1.0V (205 ADC counts) as person detection
+// - Uses HYSTERESIS: Different thresholds for activation vs deactivation
+//   * Activation: Requires >0.9V (184 ADC) for 50ms (prevents noise false triggers)
+//   * Deactivation: Requires <0.7V (143 ADC) for 50ms (allows TiM240 0.8V to trigger)
 // - Triggers 5-second alarm when ANY LiDAR detects person
 // - Sends status updates to Pi every second
 // - Responds to Pi commands for testing
 //
-// Voltage Threshold:
-// - 1.0V = 205 ADC counts (theoretical)
-// - Using 205 ADC counts for reliable detection with margin
-// - Adjust VOLTAGE_THRESHOLD if needed (higher = less sensitive, lower = more sensitive)
+// Hysteresis Benefits:
+// - Prevents false triggers from noise (higher activation threshold)
+// - Allows TiM240's 0.8V to trigger (lower deactivation threshold)
+// - Time-based confirmation (50ms) filters out brief spikes
+// - Adjust thresholds if needed:
+//   * Higher THRESHOLD_HIGH = less sensitive, fewer false triggers
+//   * Lower THRESHOLD_LOW = easier to clear, more responsive
