@@ -3,7 +3,7 @@
 // Useful for testing if SEC110 responds to a single trigger
 
 const int OUTPUT_PIN = 7;  // Pin to output clean signal (change as needed)
-const unsigned long PULSE_WIDTH_US = 1000;  // Pulse width in microseconds (adjust as needed)
+const unsigned long PULSE_WIDTH_MS = 1500;  // Pulse width in milliseconds (1.5 seconds)
 
 void setup() {
   Serial.begin(9600);
@@ -15,14 +15,14 @@ void setup() {
   Serial.println("# SEC110 Trigger Test - Single Pulse");
   Serial.println("# Output pin: " + String(OUTPUT_PIN));
   Serial.println("# Will output ONE 0→5V pulse on startup");
-  Serial.println("# Pulse width: " + String(PULSE_WIDTH_US) + " microseconds");
+  Serial.println("# Pulse width: " + String(PULSE_WIDTH_MS) + " milliseconds (1.5 seconds)");
   
   delay(500);  // Wait 500ms after startup
   
   // Generate clean rising edge pulse
   Serial.println("# Generating pulse...");
   digitalWrite(OUTPUT_PIN, HIGH);  // Rising edge (0V → 5V)
-  delayMicroseconds(PULSE_WIDTH_US);  // Hold HIGH
+  delay(PULSE_WIDTH_MS);  // Hold HIGH for 1.5 seconds
   digitalWrite(OUTPUT_PIN, LOW);   // Falling edge (5V → 0V)
   
   Serial.println("# Pulse complete!");
