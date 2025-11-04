@@ -1,6 +1,6 @@
 // LiDAR Detection System - Second Arduino (Analog Input Version)
 // Monitors OR gate input from TiM100, TiM150, and TiM240 detection circuit
-// Uses ANALOG INPUT to detect 0.8V signals (TiM240 GPIO output)
+// Uses ANALOG INPUT to detect 1.0V signals (TiM240 GPIO output via OR gate)
 // Activates alarm circuit when ANY LiDAR detects a person
 // Sends status back to Pi for webapp display
 
@@ -8,11 +8,11 @@ const int INPUT_PIN = A0;           // Analog input (TiM100 OR TiM150 OR TiM240)
 const int BUZZER_PIN = 9;           // Piezo buzzer
 const int LED_PIN = 13;              // Status LED
 
-// Analog voltage threshold (0.8V detection)
+// Analog voltage threshold (1.0V detection)
 // Arduino ADC: 0-1023 for 0-5V
-// 0.8V = (0.8/5.0) * 1023 ≈ 164 ADC counts
-// Using 165 for reliable detection with some margin
-const int VOLTAGE_THRESHOLD = 165;  // ~0.8V threshold
+// 1.0V = (1.0/5.0) * 1023 ≈ 205 ADC counts
+// Using 205 for reliable detection with some margin
+const int VOLTAGE_THRESHOLD = 205;  // ~1.0V threshold
 
 // Detection state
 bool person_detected = false;
@@ -64,7 +64,7 @@ void setup() {
   Serial.println("# OR Gate Input: Analog Pin A0 (TiM100 OR TiM150 OR TiM240)");
   Serial.print("# Voltage Threshold: ");
   Serial.print(VOLTAGE_THRESHOLD);
-  Serial.print(" ADC (~");
+  Serial.print(" ADC (");
   Serial.print((VOLTAGE_THRESHOLD * 5.0 / 1023.0), 2);
   Serial.println("V)");
   Serial.println("# Alarm: Buzzer Pin 9, LED Pin 13");
@@ -85,7 +85,7 @@ void loop() {
   int rawVoltage = analogRead(INPUT_PIN);
   
   // Convert analog reading to digital level based on threshold
-  // Voltage > 0.8V (threshold) = HIGH = person detected
+  // Voltage > 1.0V (threshold) = HIGH = person detected
   int rawLevel = (rawVoltage > VOLTAGE_THRESHOLD) ? HIGH : LOW;
   
   unsigned long now = millis();
@@ -292,19 +292,19 @@ void sendStatusToPi() {
 // OR Gate Output → Analog Pin A0 (with pull-down resistor to GND)
 //   - TiM100 Signal → OR Gate Input 1
 //   - TiM150 Signal → OR Gate Input 2  
-//   - TiM240 Signal → OR Gate Input 3 (from Pi via GPIO, ~0.8V when HIGH)
+//   - TiM240 Signal → OR Gate Input 3 (from Pi via GPIO, ~0.8V when HIGH, but OR gate may amplify)
 // Piezo Buzzer → Pin 9
 // Status LED → Pin 13 (blinks during alarm)
 // GND → Common ground
 //
 // Expected Behavior:
 // - Monitors OR gate input via analog pin A0
-// - Detects voltage > 0.8V (165 ADC counts) as person detection
+// - Detects voltage > 1.0V (205 ADC counts) as person detection
 // - Triggers 5-second alarm when ANY LiDAR detects person
 // - Sends status updates to Pi every second
 // - Responds to Pi commands for testing
 //
 // Voltage Threshold:
-// - 0.8V = 164 ADC counts (theoretical)
-// - Using 165 ADC counts for reliable detection with margin
+// - 1.0V = 205 ADC counts (theoretical)
+// - Using 205 ADC counts for reliable detection with margin
 // - Adjust VOLTAGE_THRESHOLD if needed (higher = less sensitive, lower = more sensitive)

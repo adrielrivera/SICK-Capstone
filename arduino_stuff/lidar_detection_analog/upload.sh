@@ -42,4 +42,4 @@ fi
 
 echo "SUCCESS: $SKETCH_NAME uploaded to Arduino."
 echo "=========================================="
-echo "NOTE: Uses analog pin A0 with 0.8V threshold (~165 ADC counts)"
+echo "NOTE: Uses analog pin A0 with 1.0V threshold (~205 ADC counts)"
