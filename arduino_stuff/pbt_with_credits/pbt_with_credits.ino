@@ -46,7 +46,7 @@ const int HITS_PER_CREDIT = 2;
 
 // Credit add interrupt debouncing
 volatile unsigned long lastCreditAddMs = 0;  // Last time credit was added via interrupt
-const unsigned long CREDIT_ADD_DEBOUNCE_MS = 50;  // Debounce time (50ms = max 20 credits/second, prevents multiple triggers)
+const unsigned long CREDIT_ADD_DEBOUNCE_MS = 500;  // Debounce time (500ms = max 2 credits/second, prevents bounce/glitches)
 
 unsigned long nextSample = 0;
 
@@ -56,7 +56,7 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   pinMode(GPIO_PIN6, OUTPUT);
   pinMode(GPIO_PIN5, OUTPUT);
-  pinMode(CREDIT_ADD_PIN, INPUT_PULLUP);  // Enable internal pull-up, expects HIGH (5V) normally
+  pinMode(CREDIT_ADD_PIN, INPUT);  // No pull-up, Pi GPIO controls the pin directly (3.3V HIGH, 0V LOW)
   
   // Set initial GPIO states (idle state)
   digitalWrite(LED_PIN, LOW);
@@ -78,7 +78,7 @@ void setup() {
   Serial.println("# Expected baseline: ~385 ADC counts (1.88V)");
   Serial.println("# Expected peak: ~607 ADC counts (2.96V)");
   Serial.println("# GPIO: Pin 6 (START), Pin 5 (ACTIVE) - 5V output");
-  Serial.println("# Credit Add: Pin 2 (falling edge 5V→0V triggers +1 credit)");
+  Serial.println("# Credit Add: Pin 2 (falling edge 3.3V→0V from Pi GPIO triggers +1 credit)");
   Serial.println("# Commands: PIN6_HIGH, PIN6_LOW, PIN5_HIGH, PIN5_LOW, RESET_GPIO, STATUS");
   Serial.println("# Credit Commands: PBT_HIT, GET_CREDITS, SET_CREDITS:<n>, ADD_CREDITS:<n>");
   Serial.println("# CALIBRATING...");
@@ -362,8 +362,10 @@ void handleCreditAdd() {
 //   Pin 5 (ACTIVE) ─────────── Arduino Pin 5
 // Credit Add Signal:
 //   Pi GPIO 18 (Pin 12) ────── Arduino Pin 2
-//   Signal: Falling edge (5V → 0V) triggers +1 credit
-//   Arduino Pin 2: INPUT_PULLUP (normally HIGH, goes LOW on falling edge)
+//   Signal: Falling edge (3.3V HIGH → 0V LOW) triggers +1 credit
+//   Arduino Pin 2: INPUT (no pull-up, Pi GPIO controls directly)
+//   Idle: Pi GPIO HIGH (3.3V) = Arduino sees HIGH
+//   Trigger: Pi GPIO LOW (0V) = Arduino sees LOW (falling edge detected)
 //
 // Credit System:
 //   - 2 PBT hits = 1 credit deducted
