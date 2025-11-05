@@ -1,11 +1,14 @@
-// LiDAR Detection System - Dual Input Arduino
+// LiDAR Detection System - Dual Input Arduino + Credit Tracking
 // Input 1: OR gate from side LiDARs (TiM100/TiM150) - Analog Pin A0 (5V signal)
 // Input 2: TiM240 from Pi GPIO - Digital Pin 3 (3.3V signal)
+// Credit Add: Pi GPIO 18 → Digital Pin 2 (falling edge 3.3V→0V)
 // Activates alarm circuit when ANY LiDAR detects a person
+// Tracks credits: 2 PBT hits = 1 credit deducted
 // Sends status back to Pi for webapp display
 
 const int OR_GATE_PIN = A0;        // Analog input - OR gate (TiM100 OR TiM150, outputs 5V)
-const int TIM240_PIN = 3;          // Digital input - TiM240 from Pi GPIO (3.3V HIGH when detected)
+const int TIM240_PIN = 3;           // Digital input - TiM240 from Pi GPIO (3.3V HIGH when detected)
+const int CREDIT_ADD_PIN = 2;       // Digital input - Credit add signal from Pi GPIO (falling edge 3.3V→0V)
 const int BUZZER_PIN = 9;           // Piezo buzzer
 const int LED_PIN = 13;             // Status LED
 
@@ -33,6 +36,17 @@ unsigned long tim240_detectionStartTime = 0;
 bool or_gate_detected = false;
 bool tim240_detected = false;
 
+// Credit tracking system
+volatile int credits = 0;              // Current credit count (starts at 0) - volatile for interrupt
+int pbt_hit_count = 0;                 // Count PBT hits (2 hits = 1 credit deducted)
+const int HITS_PER_CREDIT = 2;
+
+// Credit add interrupt debouncing (flag-based approach)
+volatile bool creditAddPending = false;  // Flag set by interrupt, processed in main loop
+volatile unsigned long creditAddInterruptTime = 0;  // Timestamp when interrupt fired
+unsigned long lastCreditAddProcessedMs = 0;  // Last time credit was actually added
+const unsigned long CREDIT_ADD_DEBOUNCE_MS = 1000;  // Debounce time (1000ms = max 1 credit/second)
+
 // Serial communication with Pi
 String serialCommand = "";
 bool commandReady = false;
@@ -47,6 +61,7 @@ void setup() {
   // Pin setup
   pinMode(OR_GATE_PIN, INPUT);      // Analog input for OR gate
   pinMode(TIM240_PIN, INPUT);       // Digital input from Pi GPIO (no pull-up, Pi controls it)
+  pinMode(CREDIT_ADD_PIN, INPUT);   // Digital input from Pi GPIO for credit add (no pull-up, Pi controls it)
   pinMode(BUZZER_PIN, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   
@@ -58,7 +73,15 @@ void setup() {
   or_gate_detectionStartTime = 0;
   tim240_detectionStartTime = 0;
   
-  Serial.println("# LiDAR Detection System - Arduino Ready (Dual Input)");
+  // Initialize credit system
+  creditAddPending = false;
+  creditAddInterruptTime = 0;
+  lastCreditAddProcessedMs = 0;
+  
+  // Attach interrupt for credit add signal (falling edge: 3.3V → 0V)
+  attachInterrupt(digitalPinToInterrupt(CREDIT_ADD_PIN), handleCreditAdd, FALLING);
+  
+  Serial.println("# LiDAR Detection System - Arduino Ready (Dual Input + Credit Tracking)");
   Serial.println("# Input 1: Analog Pin A0 - OR Gate (TiM100 OR TiM150, 5V signal)");
   Serial.print("#   Threshold: ");
   Serial.print(OR_GATE_THRESHOLD);
@@ -71,8 +94,15 @@ void setup() {
   Serial.print("#   Confirmation: ");
   Serial.print(TIM240_CONFIRMATION_MS);
   Serial.println(" ms");
+  Serial.println("# Credit Add: Digital Pin 2 - Pi GPIO 18 (falling edge 3.3V→0V triggers +1 credit)");
+  Serial.println("# Credit System: 2 PBT hits = 1 credit deducted");
   Serial.println("# Alarm: Buzzer Pin 9, LED Pin 13");
   Serial.println("# Commands: STATUS, RESET_ALARM, SIMULATE_DETECTION, SIMULATE_CLEAR");
+  Serial.println("# Credit Commands: PBT_HIT, GET_CREDITS, SET_CREDITS:<n>, ADD_CREDITS:<n>");
+  
+  // Send initial credit status
+  sendCreditStatus();
+  
   Serial.println("# READY");
   
   // Blink LED to indicate ready
@@ -89,6 +119,22 @@ void loop() {
   
   // Handle serial commands from Pi
   handleSerialCommands();
+  
+  // Process pending credit add from interrupt (with debouncing)
+  if (creditAddPending) {
+    // Check debounce: only process if enough time has passed since last credit add
+    if (now - lastCreditAddProcessedMs >= CREDIT_ADD_DEBOUNCE_MS) {
+      // Process the credit add
+      credits++;
+      pbt_hit_count = 0;  // Reset hit counter when manually adding credits
+      lastCreditAddProcessedMs = now;
+      
+      sendCreditStatus();
+      Serial.println("# Credit added via hardware signal (Pin 2 falling edge)");
+    }
+    // Clear the flag regardless (debounce prevents multiple triggers)
+    creditAddPending = false;
+  }
   
   // ============================================================
   // READ INPUT 1: OR Gate (Side LiDARs - TiM100/TiM150)
@@ -213,6 +259,7 @@ void processCommand(String command) {
   
   if (command == "STATUS") {
     sendStatusToPi();
+    sendCreditStatus();
     // Also print current input states for debugging
     int or_voltage = analogRead(OR_GATE_PIN);
     int tim240_level = digitalRead(TIM240_PIN);
@@ -240,6 +287,35 @@ void processCommand(String command) {
     person_detected = false;
     Serial.println("# Simulated clear triggered");
   }
+  // Credit tracking commands
+  else if (command == "PBT_HIT") {
+    handlePBTHit();
+  }
+  else if (command == "GET_CREDITS") {
+    sendCreditStatus();
+  }
+  else if (command.startsWith("SET_CREDITS:")) {
+    int newCredits = command.substring(12).toInt();
+    if (newCredits >= 0) {
+      credits = newCredits;
+      pbt_hit_count = 0;  // Reset hit counter when manually setting credits
+      Serial.print("# Credits set to: ");
+      Serial.println(credits);
+      sendCreditStatus();
+    }
+  }
+  else if (command.startsWith("ADD_CREDITS:")) {
+    int addCredits = command.substring(12).toInt();
+    if (addCredits > 0) {
+      credits += addCredits;
+      Serial.print("# Credits added: ");
+      Serial.print(addCredits);
+      Serial.print(" (Total: ");
+      Serial.print(credits);
+      Serial.println(")");
+      sendCreditStatus();
+    }
+  }
   else {
     Serial.print("# Unknown command: ");
     Serial.println(command);
@@ -254,6 +330,54 @@ void sendStatusToPi() {
   Serial.println();
 }
 
+void sendCreditStatus() {
+  Serial.print("CREDITS:");
+  Serial.println(credits);
+}
+
+void handlePBTHit() {
+  // Increment PBT hit counter
+  pbt_hit_count++;
+  
+  Serial.print("# PBT_HIT received (hit #");
+  Serial.print(pbt_hit_count);
+  Serial.print(" of ");
+  Serial.print(HITS_PER_CREDIT);
+  Serial.println(")");
+  
+  // Check if we've reached the threshold for credit deduction
+  if (pbt_hit_count >= HITS_PER_CREDIT) {
+    if (credits > 0) {
+      credits--;
+      Serial.print("# Credit deducted! Credits remaining: ");
+      Serial.println(credits);
+    } else {
+      Serial.println("# No credits remaining - hit counted but no credit to deduct");
+    }
+    
+    // Reset hit counter
+    pbt_hit_count = 0;
+    
+    // Send updated credit status to Pi
+    sendCreditStatus();
+  } else {
+    // Send intermediate status (shows hit count progress)
+    Serial.print("# CREDIT_PROGRESS:");
+    Serial.print(pbt_hit_count);
+    Serial.print("/");
+    Serial.println(HITS_PER_CREDIT);
+  }
+}
+
+// Interrupt handler for credit add signal (falling edge on Pin 2)
+// Uses flag-based approach: set flag in interrupt, process in main loop
+void handleCreditAdd() {
+  // Simply set the flag - actual processing happens in main loop with proper debouncing
+  // This prevents issues with millis() not updating in interrupt context
+  creditAddPending = true;
+  creditAddInterruptTime = millis();  // Note: millis() may not update in interrupt, but we use it for reference
+}
+
 // Hardware Connections:
 // OR Gate Output → Analog Pin A0
 //   - TiM100 Signal → OR Gate Input 1
@@ -265,6 +389,11 @@ void sendStatusToPi() {
 //   - Pi GPIO outputs 3.3V HIGH when TiM240 detects person
 //   - Arduino Pin 3: INPUT (no pull-up, Pi controls it)
 //
+// Credit Add Signal:
+//   - Pi GPIO 18 (Pin 12) → Arduino Digital Pin 2
+//   - Signal: Falling edge (3.3V HIGH → 0V LOW) triggers +1 credit
+//   - Arduino Pin 2: INPUT (no pull-up, Pi controls it)
+//
 // Piezo Buzzer → Pin 9
 // Status LED → Pin 13 (blinks during alarm)
 // GND → Common ground
@@ -274,6 +403,8 @@ void sendStatusToPi() {
 // - OR gate (A0): 5V signal from side LiDARs - fast detection (10ms)
 // - TiM240 (Pin 3): 3.3V signal from Pi - digital detection (50ms)
 // - Triggers alarm if EITHER input detects person
+// - Credit System: 2 PBT hits = 1 credit deducted
+// - Credit Add: Falling edge on Pin 2 = +1 credit (hardware trigger)
 // - Sends status updates to Pi every second
-// - Responds to Pi commands for testing
+// - Responds to Pi commands for testing (LiDAR + Credit commands)
 
