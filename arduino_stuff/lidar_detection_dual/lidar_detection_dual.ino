@@ -38,8 +38,7 @@ bool tim240_detected = false;
 
 // Credit tracking system
 volatile int credits = 0;              // Current credit count (starts at 0) - volatile for interrupt
-int pbt_hit_count = 0;                 // Count PBT hits (2 hits = 1 credit deducted)
-const int HITS_PER_CREDIT = 2;
+// Note: Hit counting is done on Pi - Arduino just manages credit balance
 
 // Credit add interrupt debouncing (flag-based approach)
 volatile bool creditAddPending = false;  // Flag set by interrupt, processed in main loop
@@ -95,10 +94,10 @@ void setup() {
   Serial.print(TIM240_CONFIRMATION_MS);
   Serial.println(" ms");
   Serial.println("# Credit Add: Digital Pin 2 - Pi GPIO 18 (falling edge 3.3V→0V triggers +1 credit)");
-  Serial.println("# Credit System: 2 PBT hits = 1 credit deducted");
+  Serial.println("# Credit System: Pi tracks hits (2 hits = 1 credit), sends DEDUCT_CREDIT when needed");
   Serial.println("# Alarm: Buzzer Pin 9, LED Pin 13");
   Serial.println("# Commands: STATUS, RESET_ALARM, SIMULATE_DETECTION, SIMULATE_CLEAR");
-  Serial.println("# Credit Commands: PBT_HIT, GET_CREDITS, SET_CREDITS:<n>, ADD_CREDITS:<n>");
+  Serial.println("# Credit Commands: DEDUCT_CREDIT, GET_CREDITS, SET_CREDITS:<n>, ADD_CREDITS:<n>");
   
   // Send initial credit status
   sendCreditStatus();
@@ -126,7 +125,6 @@ void loop() {
     if (now - lastCreditAddProcessedMs >= CREDIT_ADD_DEBOUNCE_MS) {
       // Process the credit add
       credits++;
-      pbt_hit_count = 0;  // Reset hit counter when manually adding credits
       lastCreditAddProcessedMs = now;
       
       sendCreditStatus();
@@ -288,8 +286,16 @@ void processCommand(String command) {
     Serial.println("# Simulated clear triggered");
   }
   // Credit tracking commands
-  else if (command == "PBT_HIT") {
-    handlePBTHit();
+  else if (command == "DEDUCT_CREDIT") {
+    // Deduct 1 credit (Pi handles hit counting, just deducts when 2 hits reached)
+    if (credits > 0) {
+      credits--;
+      Serial.print("# Credit deducted! Credits remaining: ");
+      Serial.println(credits);
+    } else {
+      Serial.println("# No credits remaining - cannot deduct");
+    }
+    sendCreditStatus();
   }
   else if (command == "GET_CREDITS") {
     sendCreditStatus();
@@ -298,7 +304,6 @@ void processCommand(String command) {
     int newCredits = command.substring(12).toInt();
     if (newCredits >= 0) {
       credits = newCredits;
-      pbt_hit_count = 0;  // Reset hit counter when manually setting credits
       Serial.print("# Credits set to: ");
       Serial.println(credits);
       sendCreditStatus();
@@ -335,40 +340,6 @@ void sendCreditStatus() {
   Serial.println(credits);
 }
 
-void handlePBTHit() {
-  // Increment PBT hit counter
-  pbt_hit_count++;
-  
-  Serial.print("# PBT_HIT received (hit #");
-  Serial.print(pbt_hit_count);
-  Serial.print(" of ");
-  Serial.print(HITS_PER_CREDIT);
-  Serial.println(")");
-  
-  // Check if we've reached the threshold for credit deduction
-  if (pbt_hit_count >= HITS_PER_CREDIT) {
-    if (credits > 0) {
-      credits--;
-      Serial.print("# Credit deducted! Credits remaining: ");
-      Serial.println(credits);
-    } else {
-      Serial.println("# No credits remaining - hit counted but no credit to deduct");
-    }
-    
-    // Reset hit counter
-    pbt_hit_count = 0;
-    
-    // Send updated credit status to Pi
-    sendCreditStatus();
-  } else {
-    // Send intermediate status (shows hit count progress)
-    Serial.print("# CREDIT_PROGRESS:");
-    Serial.print(pbt_hit_count);
-    Serial.print("/");
-    Serial.println(HITS_PER_CREDIT);
-  }
-}
-
 // Interrupt handler for credit add signal (falling edge on Pin 2)
 // Uses flag-based approach: set flag in interrupt, process in main loop
 void handleCreditAdd() {
@@ -403,7 +374,7 @@ void handleCreditAdd() {
 // - OR gate (A0): 5V signal from side LiDARs - fast detection (10ms)
 // - TiM240 (Pin 3): 3.3V signal from Pi - digital detection (50ms)
 // - Triggers alarm if EITHER input detects person
-// - Credit System: 2 PBT hits = 1 credit deducted
+// - Credit System: Pi tracks hits (2 hits = 1 credit), sends DEDUCT_CREDIT command
 // - Credit Add: Falling edge on Pin 2 = +1 credit (hardware trigger)
 // - Sends status updates to Pi every second
 // - Responds to Pi commands for testing (LiDAR + Credit commands)
