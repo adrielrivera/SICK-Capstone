@@ -1,6 +1,7 @@
-// LiDAR Detection System - Second Arduino (Analog Input Version with Hysteresis)
+// LiDAR Detection System - Second Arduino (Analog Input with Dual-Path Detection)
 // Monitors OR gate input from TiM100, TiM150, and TiM240 detection circuit
-// Uses ANALOG INPUT with HYSTERESIS to reliably detect 0.8V signals while filtering noise
+// Uses DUAL-PATH DETECTION: Fast path for strong signals (5V), careful path for weak signals (0.8V)
+// Includes MOVING AVERAGE FILTERING to smooth noise
 // Activates alarm circuit when ANY LiDAR detects a person
 // Sends status back to Pi for webapp display
 
@@ -8,12 +9,23 @@ const int INPUT_PIN = A0;           // Analog input (TiM100 OR TiM150 OR TiM240)
 const int BUZZER_PIN = 9;           // Piezo buzzer
 const int LED_PIN = 13;              // Status LED
 
-// Analog voltage thresholds with hysteresis
+// Dual-path detection thresholds
 // Arduino ADC: 0-1023 for 0-5V
-// Hysteresis prevents false triggers from noise while allowing TiM240's 0.8V to trigger
-const int THRESHOLD_HIGH = 184;  // ~0.9V - activate detection (prevents noise false triggers)
-const int THRESHOLD_LOW = 143;   // ~0.7V - deactivate detection (allows TiM240 0.8V to trigger)
-const unsigned long CONFIRMATION_MS = 50;  // Require stable signal for 50ms before triggering
+// Strong signal path: Side LiDARs (TiM100/TiM150) output 5V
+// Weak signal path: Top LiDAR (TiM240) outputs 0.8-1V
+const int STRONG_THRESHOLD = 400;    // ~2V - clearly above noise, fast detection for 5V signals
+const unsigned long STRONG_CONFIRMATION_MS = 10;  // Fast confirmation for strong signals
+
+// Weak signal path (TiM240) - hysteresis to handle 0.8-1V signals
+const int WEAK_THRESHOLD_HIGH = 165; // ~0.8V - activate detection
+const int WEAK_THRESHOLD_LOW = 143;  // ~0.7V - deactivate detection
+const unsigned long WEAK_CONFIRMATION_MS = 100;  // Longer confirmation for weak signals
+
+// Moving average filter
+const int SAMPLE_COUNT = 5;          // Number of samples for averaging
+int voltageBuffer[SAMPLE_COUNT] = {0};
+int bufferIndex = 0;
+bool bufferInitialized = false;
 
 // Detection state
 bool person_detected = false;
@@ -56,29 +68,44 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   lastHighMs = millis();  // Initialize to current time (pin starts LOW)
   
-  // Initialize pin state tracking based on actual analog reading
-  int initialVoltage = analogRead(INPUT_PIN);
-  int initialPinState = (initialVoltage > THRESHOLD_HIGH) ? HIGH : LOW;
-  wasLowLastCycle = (initialPinState == LOW);
+  // Initialize moving average buffer
+  for (int i = 0; i < SAMPLE_COUNT; i++) {
+    voltageBuffer[i] = analogRead(INPUT_PIN);
+    delay(5);  // Small delay between samples
+  }
+  bufferInitialized = true;
+  bufferIndex = 0;
+  
+  // Initialize pin state tracking
+  int initialVoltage = calculateMovingAverage();
+  wasLowLastCycle = (initialVoltage < STRONG_THRESHOLD && initialVoltage < WEAK_THRESHOLD_HIGH);
   if (wasLowLastCycle) {
     continuousLowStartMs = millis();  // Pin starts LOW
   }
   detectionStartTime = 0;  // Initialize detection timer
   
-  Serial.println("# LiDAR Detection System - Arduino Ready (Analog Input with Hysteresis)");
+  Serial.println("# LiDAR Detection System - Arduino Ready (Dual-Path Detection)");
   Serial.println("# OR Gate Input: Analog Pin A0 (TiM100 OR TiM150 OR TiM240)");
-  Serial.print("# Activation Threshold: ");
-  Serial.print(THRESHOLD_HIGH);
+  Serial.println("# Moving Average Filter: 5 samples");
+  Serial.println("# --- Strong Signal Path (Side LiDARs: 5V) ---");
+  Serial.print("#   Threshold: ");
+  Serial.print(STRONG_THRESHOLD);
   Serial.print(" ADC (");
-  Serial.print((THRESHOLD_HIGH * 5.0 / 1023.0), 2);
-  Serial.println("V) - prevents noise false triggers");
-  Serial.print("# Deactivation Threshold: ");
-  Serial.print(THRESHOLD_LOW);
+  Serial.print((STRONG_THRESHOLD * 5.0 / 1023.0), 2);
+  Serial.print("V), Confirmation: ");
+  Serial.print(STRONG_CONFIRMATION_MS);
+  Serial.println(" ms");
+  Serial.println("# --- Weak Signal Path (Top LiDAR: 0.8-1V) ---");
+  Serial.print("#   Activation: ");
+  Serial.print(WEAK_THRESHOLD_HIGH);
   Serial.print(" ADC (");
-  Serial.print((THRESHOLD_LOW * 5.0 / 1023.0), 2);
-  Serial.println("V) - allows TiM240 0.8V to trigger");
-  Serial.print("# Confirmation Time: ");
-  Serial.print(CONFIRMATION_MS);
+  Serial.print((WEAK_THRESHOLD_HIGH * 5.0 / 1023.0), 2);
+  Serial.print("V), Deactivation: ");
+  Serial.print(WEAK_THRESHOLD_LOW);
+  Serial.print(" ADC (");
+  Serial.print((WEAK_THRESHOLD_LOW * 5.0 / 1023.0), 2);
+  Serial.print("V), Confirmation: ");
+  Serial.print(WEAK_CONFIRMATION_MS);
   Serial.println(" ms");
   Serial.println("# Alarm: Buzzer Pin 9, LED Pin 13");
   Serial.println("# Commands: STATUS, RESET_ALARM, SIMULATE_DETECTION, SIMULATE_CLEAR");
@@ -93,49 +120,77 @@ void setup() {
   }
 }
 
+// Calculate moving average of voltage readings
+int calculateMovingAverage() {
+  int sum = 0;
+  for (int i = 0; i < SAMPLE_COUNT; i++) {
+    sum += voltageBuffer[i];
+  }
+  return sum / SAMPLE_COUNT;
+}
+
 void loop() {
-  // Read analog voltage (0-1023 for 0-5V)
-  int rawVoltage = analogRead(INPUT_PIN);
+  // Read analog voltage and add to moving average buffer
+  voltageBuffer[bufferIndex] = analogRead(INPUT_PIN);
+  bufferIndex = (bufferIndex + 1) % SAMPLE_COUNT;
+  
+  // Calculate filtered voltage (moving average smooths noise)
+  int filteredVoltage = calculateMovingAverage();
   
   unsigned long now = millis();
   
   // Handle serial commands from Pi
   handleSerialCommands();
   
-  // HYSTERESIS LOGIC WITH TIME-BASED CONFIRMATION
-  // Use different thresholds for activation vs deactivation to prevent false triggers
+  // DUAL-PATH DETECTION WITH TIME-BASED CONFIRMATION
+  // Path 1: Strong signals (5V from side LiDARs) - fast detection
+  // Path 2: Weak signals (0.8-1V from TiM240) - careful hysteresis
   
   if (!person_detected) {
-    // NOT DETECTING: Require HIGH threshold to activate (prevents noise false triggers)
-    if (rawVoltage > THRESHOLD_HIGH) {
-      // Signal above activation threshold
+    // NOT DETECTING: Check for strong signal first (fast path)
+    if (filteredVoltage > STRONG_THRESHOLD) {
+      // Strong signal detected (5V from side LiDARs)
       if (detectionStartTime == 0) {
-        // Start timing - signal just crossed threshold
         detectionStartTime = now;
-      } else if ((now - detectionStartTime) >= CONFIRMATION_MS) {
-        // Confirmed: stable signal above threshold for confirmation time
+      } else if ((now - detectionStartTime) >= STRONG_CONFIRMATION_MS) {
+        // Confirmed: strong signal stable for short confirmation time
         person_detected = true;
-        detectionStartTime = 0;  // Reset timer
+        detectionStartTime = 0;
         triggerAlarm();
         sendStatusToPi();
-        Serial.println("✅ Person detected - Confirmed after stable signal");
+        Serial.println("✅ Person detected - Strong signal (side LiDAR)");
       }
-      // If not confirmed yet, keep waiting (don't reset timer)
+    }
+    // Then check for weak signal (hysteresis path)
+    else if (filteredVoltage > WEAK_THRESHOLD_HIGH) {
+      // Weak signal above activation threshold (TiM240)
+      if (detectionStartTime == 0) {
+        detectionStartTime = now;
+      } else if ((now - detectionStartTime) >= WEAK_CONFIRMATION_MS) {
+        // Confirmed: weak signal stable for longer confirmation time
+        person_detected = true;
+        detectionStartTime = 0;
+        triggerAlarm();
+        sendStatusToPi();
+        Serial.println("✅ Person detected - Weak signal (top LiDAR)");
+      }
     } else {
-      // Signal dropped below threshold before confirmation
-      detectionStartTime = 0;  // Reset timer
+      // Signal below both thresholds - reset timer
+      detectionStartTime = 0;
     }
   } else {
-    // DETECTING: Use LOW threshold to deactivate (easier to clear, allows TiM240 0.8V to work)
-    if (rawVoltage < THRESHOLD_LOW) {
-      // Signal below deactivation threshold
+    // DETECTING: Check which path to use for deactivation
+    if (filteredVoltage > STRONG_THRESHOLD) {
+      // Still strong signal - keep detecting, reset timer
+      detectionStartTime = 0;
+    } else if (filteredVoltage < WEAK_THRESHOLD_LOW) {
+      // Signal dropped below weak deactivation threshold
       if (detectionStartTime == 0) {
-        // Start timing - signal just dropped below threshold
         detectionStartTime = now;
-      } else if ((now - detectionStartTime) >= CONFIRMATION_MS) {
+      } else if ((now - detectionStartTime) >= WEAK_CONFIRMATION_MS) {
         // Confirmed: stable low signal for confirmation time
         person_detected = false;
-        detectionStartTime = 0;  // Reset timer
+        detectionStartTime = 0;
         // Ensure alarm is stopped (clean state)
         if (alarmActive) {
           alarmActive = false;
@@ -145,16 +200,15 @@ void loop() {
         Serial.println("✅ Area clear - Person left (confirmed after stable low signal)");
         sendStatusToPi();
       }
-      // If not confirmed yet, keep waiting (don't reset timer)
     } else {
-      // Signal still above deactivation threshold
-      detectionStartTime = 0;  // Reset timer
+      // Signal between thresholds - reset timer (might be transitioning)
+      detectionStartTime = 0;
     }
   }
   
   // Convert to digital level for compatibility with existing tracking code
-  // Use HIGH threshold for general tracking purposes
-  int rawLevel = (rawVoltage > THRESHOLD_HIGH) ? HIGH : LOW;
+  // Use strong threshold for general tracking
+  int rawLevel = (filteredVoltage > STRONG_THRESHOLD || filteredVoltage > WEAK_THRESHOLD_HIGH) ? HIGH : LOW;
   
   // Track when pin was last HIGH (for robust force clear)
   if (rawLevel == HIGH) {
@@ -177,8 +231,8 @@ void loop() {
   }
   
   // Additional safety: If pin has been continuously LOW for extended period, force clear
-  // This ensures clean state even if hysteresis logic missed the transition
-  if (rawVoltage < THRESHOLD_LOW && person_detected && continuousLowStartMs > 0 && (now - continuousLowStartMs) > 200) {
+  // This ensures clean state even if dual-path logic missed the transition
+  if (filteredVoltage < WEAK_THRESHOLD_LOW && person_detected && continuousLowStartMs > 0 && (now - continuousLowStartMs) > 200) {
     // Force clear regardless of confirmation state - pin has been continuously LOW for 200ms
     person_detected = false;
     detectionStartTime = 0;
@@ -195,7 +249,7 @@ void loop() {
   
   // Extra safety: If alarm finished and pin is LOW, immediately clear (no delay)
   // This handles the case where alarm completes but person_detected wasn't cleared
-  if (!alarmActive && rawVoltage < THRESHOLD_LOW && person_detected) {
+  if (!alarmActive && filteredVoltage < WEAK_THRESHOLD_LOW && person_detected) {
     person_detected = false;
     detectionStartTime = 0;
     continuousLowStartMs = 0;
@@ -277,12 +331,17 @@ void processCommand(String command) {
   
   if (command == "STATUS") {
     sendStatusToPi();
-    // Also print current voltage for debugging
-    int voltage = analogRead(INPUT_PIN);
-    Serial.print("# Current voltage: ");
-    Serial.print(voltage);
+    // Also print current voltage for debugging (both raw and filtered)
+    int rawVoltage = analogRead(INPUT_PIN);
+    int filteredVoltage = calculateMovingAverage();
+    Serial.print("# Raw voltage: ");
+    Serial.print(rawVoltage);
     Serial.print(" ADC (");
-    Serial.print((voltage * 5.0 / 1023.0), 2);
+    Serial.print((rawVoltage * 5.0 / 1023.0), 2);
+    Serial.print("V), Filtered: ");
+    Serial.print(filteredVoltage);
+    Serial.print(" ADC (");
+    Serial.print((filteredVoltage * 5.0 / 1023.0), 2);
     Serial.println("V)");
   }
   else if (command == "RESET_ALARM") {
@@ -327,17 +386,22 @@ void sendStatusToPi() {
 //
 // Expected Behavior:
 // - Monitors OR gate input via analog pin A0
-// - Uses HYSTERESIS: Different thresholds for activation vs deactivation
-//   * Activation: Requires >0.9V (184 ADC) for 50ms (prevents noise false triggers)
-//   * Deactivation: Requires <0.7V (143 ADC) for 50ms (allows TiM240 0.8V to trigger)
+// - Uses MOVING AVERAGE FILTER (5 samples) to smooth noise
+// - Uses DUAL-PATH DETECTION:
+//   * Strong Signal Path (Side LiDARs: 5V):
+//     - Threshold: >2V (400 ADC) for fast detection
+//     - Confirmation: 10ms (fast response)
+//   * Weak Signal Path (Top LiDAR: 0.8-1V):
+//     - Activation: >0.8V (165 ADC) with hysteresis
+//     - Deactivation: <0.7V (143 ADC)
+//     - Confirmation: 100ms (careful filtering)
 // - Triggers 5-second alarm when ANY LiDAR detects person
 // - Sends status updates to Pi every second
 // - Responds to Pi commands for testing
 //
-// Hysteresis Benefits:
-// - Prevents false triggers from noise (higher activation threshold)
-// - Allows TiM240's 0.8V to trigger (lower deactivation threshold)
-// - Time-based confirmation (50ms) filters out brief spikes
-// - Adjust thresholds if needed:
-//   * Higher THRESHOLD_HIGH = less sensitive, fewer false triggers
-//   * Lower THRESHOLD_LOW = easier to clear, more responsive
+// Dual-Path Benefits:
+// - Fast response for strong signals (5V side LiDARs)
+// - Robust detection for weak signals (0.8V top LiDAR)
+// - Moving average smooths noise spikes
+// - Hysteresis prevents oscillation
+// - Different confirmation times optimized for each signal type
