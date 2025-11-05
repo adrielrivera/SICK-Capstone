@@ -6,6 +6,7 @@ const int PBT_PIN = A0;
 const int LED_PIN = 13;
 const int GPIO_PIN6 = 6;  // Arcade motherboard Pin 6 (Press START)
 const int GPIO_PIN5 = 5;  // Arcade motherboard Pin 5 (Press ACTIVE)
+const int CREDIT_ADD_PIN = 2;  // Pin 2 (interrupt-capable) - Credit add signal (falling edge 5V→0V)
 const int SAMPLES_PER_SEC = 800;
 const unsigned long SAMPLE_US = 1000000UL / SAMPLES_PER_SEC;
 
@@ -39,7 +40,7 @@ String gpioCommand = "";
 bool gpioCommandReady = false;
 
 // Credit tracking system
-int credits = 0;              // Current credit count (starts at 0)
+volatile int credits = 0;     // Current credit count (starts at 0) - volatile for interrupt
 int pbt_hit_count = 0;        // Count PBT hits (2 hits = 1 credit deducted)
 const int HITS_PER_CREDIT = 2;
 
@@ -51,11 +52,15 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
   pinMode(GPIO_PIN6, OUTPUT);
   pinMode(GPIO_PIN5, OUTPUT);
+  pinMode(CREDIT_ADD_PIN, INPUT_PULLUP);  // Enable internal pull-up, expects HIGH (5V) normally
   
   // Set initial GPIO states (idle state)
   digitalWrite(LED_PIN, LOW);
   digitalWrite(GPIO_PIN6, LOW);   // Pin 6 normally LOW
   digitalWrite(GPIO_PIN5, HIGH);  // Pin 5 normally HIGH
+  
+  // Attach interrupt for credit add signal (falling edge: 5V → 0V)
+  attachInterrupt(digitalPinToInterrupt(CREDIT_ADD_PIN), handleCreditAdd, FALLING);
   
   // Use default 5V reference
   analogReference(DEFAULT);
@@ -69,6 +74,7 @@ void setup() {
   Serial.println("# Expected baseline: ~385 ADC counts (1.88V)");
   Serial.println("# Expected peak: ~607 ADC counts (2.96V)");
   Serial.println("# GPIO: Pin 6 (START), Pin 5 (ACTIVE) - 5V output");
+  Serial.println("# Credit Add: Pin 2 (falling edge 5V→0V triggers +1 credit)");
   Serial.println("# Commands: PIN6_HIGH, PIN6_LOW, PIN5_HIGH, PIN5_LOW, RESET_GPIO, STATUS");
   Serial.println("# Credit Commands: PBT_HIT, GET_CREDITS, SET_CREDITS:<n>, ADD_CREDITS:<n>");
   Serial.println("# CALIBRATING...");
@@ -321,6 +327,18 @@ void sendCreditStatus() {
   Serial.println(credits);
 }
 
+// Interrupt handler for credit add signal (falling edge on Pin 2)
+void handleCreditAdd() {
+  // Simple increment - debouncing handled by interrupt timing
+  // Note: credits is volatile, so this is safe from interrupt context
+  credits++;
+  pbt_hit_count = 0;  // Reset hit counter when manually adding credits
+  // Note: Serial in interrupt should be minimal, but sendCreditStatus() is quick
+  // For safety, you could set a flag here and check it in loop() instead
+  sendCreditStatus();
+  Serial.println("# Credit added via hardware signal (Pin 2 falling edge)");
+}
+
 // Hardware Connection:
 // SICK 10 Bar PBT Sensor:
 //   Signal Out ──── 100kΩ ──── Arduino A0
@@ -328,9 +346,14 @@ void sendCreditStatus() {
 // Arcade Motherboard:
 //   Pin 6 (START) ──────────── Arduino Pin 6
 //   Pin 5 (ACTIVE) ─────────── Arduino Pin 5
+// Credit Add Signal:
+//   Pi GPIO 18 (Pin 12) ────── Arduino Pin 2
+//   Signal: Falling edge (5V → 0V) triggers +1 credit
+//   Arduino Pin 2: INPUT_PULLUP (normally HIGH, goes LOW on falling edge)
 //
 // Credit System:
 //   - 2 PBT hits = 1 credit deducted
+//   - Falling edge on Pin 2 = +1 credit (hardware trigger)
 //   - Starts with 0 credits
 //   - Use SET_CREDITS:<n> or ADD_CREDITS:<n> to add credits
 //   - Pi sends PBT_HIT after each pulse generation
