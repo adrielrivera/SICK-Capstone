@@ -44,9 +44,11 @@ volatile int credits = 0;     // Current credit count (starts at 0) - volatile f
 int pbt_hit_count = 0;        // Count PBT hits (2 hits = 1 credit deducted)
 const int HITS_PER_CREDIT = 2;
 
-// Credit add interrupt debouncing
-volatile unsigned long lastCreditAddMs = 0;  // Last time credit was added via interrupt
-const unsigned long CREDIT_ADD_DEBOUNCE_MS = 500;  // Debounce time (500ms = max 2 credits/second, prevents bounce/glitches)
+// Credit add interrupt debouncing (flag-based approach)
+volatile bool creditAddPending = false;  // Flag set by interrupt, processed in main loop
+volatile unsigned long creditAddInterruptTime = 0;  // Timestamp when interrupt fired
+unsigned long lastCreditAddProcessedMs = 0;  // Last time credit was actually added
+const unsigned long CREDIT_ADD_DEBOUNCE_MS = 1000;  // Debounce time (1000ms = max 1 credit/second, prevents bounce/glitches)
 
 unsigned long nextSample = 0;
 
@@ -63,7 +65,12 @@ void setup() {
   digitalWrite(GPIO_PIN6, LOW);   // Pin 6 normally LOW
   digitalWrite(GPIO_PIN5, HIGH);  // Pin 5 normally HIGH
   
-  // Attach interrupt for credit add signal (falling edge: 5V → 0V)
+  // Initialize credit add flag
+  creditAddPending = false;
+  creditAddInterruptTime = 0;
+  lastCreditAddProcessedMs = 0;
+  
+  // Attach interrupt for credit add signal (falling edge: 3.3V → 0V)
   attachInterrupt(digitalPinToInterrupt(CREDIT_ADD_PIN), handleCreditAdd, FALLING);
   
   // Use default 5V reference
@@ -93,6 +100,22 @@ void loop() {
   
   // Handle GPIO and credit commands from Pi
   handleSerialCommands();
+  
+  // Process pending credit add from interrupt (with debouncing)
+  if (creditAddPending) {
+    // Check debounce: only process if enough time has passed since last credit add
+    if (nowMs - lastCreditAddProcessedMs >= CREDIT_ADD_DEBOUNCE_MS) {
+      // Process the credit add
+      credits++;
+      pbt_hit_count = 0;  // Reset hit counter when manually adding credits
+      lastCreditAddProcessedMs = nowMs;
+      
+      sendCreditStatus();
+      Serial.println("# Credit added via hardware signal (Pin 2 falling edge)");
+    }
+    // Clear the flag regardless (debounce prevents multiple triggers)
+    creditAddPending = false;
+  }
   
   // LED activity indicator
   if (nowMs - lastActivityMs > LED_ON_MS) {
@@ -332,25 +355,12 @@ void sendCreditStatus() {
 }
 
 // Interrupt handler for credit add signal (falling edge on Pin 2)
+// Uses flag-based approach: set flag in interrupt, process in main loop
 void handleCreditAdd() {
-  // Debounce: ignore if too soon after last interrupt
-  unsigned long now = millis();
-  if (now - lastCreditAddMs < CREDIT_ADD_DEBOUNCE_MS) {
-    // Too soon - ignore this interrupt (likely bounce/noise)
-    return;
-  }
-  
-  // Update timestamp before processing
-  lastCreditAddMs = now;
-  
-  // Increment credits (volatile, safe from interrupt context)
-  credits++;
-  pbt_hit_count = 0;  // Reset hit counter when manually adding credits
-  
-  // Note: Serial in interrupt should be minimal, but sendCreditStatus() is quick
-  // For safety, you could set a flag here and check it in loop() instead
-  sendCreditStatus();
-  Serial.println("# Credit added via hardware signal (Pin 2 falling edge)");
+  // Simply set the flag - actual processing happens in main loop with proper debouncing
+  // This prevents issues with millis() not updating in interrupt context
+  creditAddPending = true;
+  creditAddInterruptTime = millis();  // Note: millis() may not update in interrupt, but we use it for reference
 }
 
 // Hardware Connection:
