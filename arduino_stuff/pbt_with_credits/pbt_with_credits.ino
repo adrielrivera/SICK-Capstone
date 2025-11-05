@@ -44,6 +44,10 @@ volatile int credits = 0;     // Current credit count (starts at 0) - volatile f
 int pbt_hit_count = 0;        // Count PBT hits (2 hits = 1 credit deducted)
 const int HITS_PER_CREDIT = 2;
 
+// Credit add interrupt debouncing
+volatile unsigned long lastCreditAddMs = 0;  // Last time credit was added via interrupt
+const unsigned long CREDIT_ADD_DEBOUNCE_MS = 50;  // Debounce time (50ms = max 20 credits/second, prevents multiple triggers)
+
 unsigned long nextSample = 0;
 
 void setup() {
@@ -329,10 +333,20 @@ void sendCreditStatus() {
 
 // Interrupt handler for credit add signal (falling edge on Pin 2)
 void handleCreditAdd() {
-  // Simple increment - debouncing handled by interrupt timing
-  // Note: credits is volatile, so this is safe from interrupt context
+  // Debounce: ignore if too soon after last interrupt
+  unsigned long now = millis();
+  if (now - lastCreditAddMs < CREDIT_ADD_DEBOUNCE_MS) {
+    // Too soon - ignore this interrupt (likely bounce/noise)
+    return;
+  }
+  
+  // Update timestamp before processing
+  lastCreditAddMs = now;
+  
+  // Increment credits (volatile, safe from interrupt context)
   credits++;
   pbt_hit_count = 0;  // Reset hit counter when manually adding credits
+  
   // Note: Serial in interrupt should be minimal, but sendCreditStatus() is quick
   // For safety, you could set a flag here and check it in loop() instead
   sendCreditStatus();
