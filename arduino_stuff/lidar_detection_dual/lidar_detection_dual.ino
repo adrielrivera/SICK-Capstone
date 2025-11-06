@@ -96,6 +96,7 @@ void setup() {
   Serial.println(" ms");
   Serial.println("# Credit Add: Digital Pin 2 - Pi GPIO 18 (falling edge 3.3V→0V triggers +1 credit)");
   Serial.println("# Credit System: Pi tracks hits (2 hits = 1 credit), sends DEDUCT_CREDIT when needed");
+  Serial.println("# LiDAR Safety: DISABLED when credits == 0 (no detection, no alarm)");
   Serial.println("# Alarm: Buzzer Pin 9, LED Pin 13");
   Serial.println("# Commands: STATUS, RESET_ALARM, SIMULATE_DETECTION, SIMULATE_CLEAR");
   Serial.println("# Credit Commands: DEDUCT_CREDIT, GET_CREDITS, SET_CREDITS:<n>, ADD_CREDITS:<n>");
@@ -205,31 +206,49 @@ void loop() {
   // ============================================================
   // COMBINED DETECTION LOGIC (OR both inputs)
   // ============================================================
-  bool new_person_detected = (or_gate_detected || tim240_detected);
+  // CRITICAL: Only detect and trigger alarm if credits > 0
+  // When credits == 0, LiDAR safety is disabled
+  bool new_person_detected = false;
   
-  // Edge detection: trigger alarm on rising edge
-  if (new_person_detected && !person_detected) {
-    person_detected = true;
-    triggerAlarm();
-    sendStatusToPi();
-    Serial.println("✅ Person detected - Triggering alarm");
-  }
-  
-  // Clear detection on falling edge
-  if (!new_person_detected && person_detected) {
-    person_detected = false;
-    // Ensure alarm is stopped (clean state)
-    if (alarmActive) {
+  if (credits > 0) {
+    // Credits available - process detection normally
+    new_person_detected = (or_gate_detected || tim240_detected);
+    
+    // Edge detection: trigger alarm on rising edge
+    if (new_person_detected && !person_detected) {
+      person_detected = true;
+      triggerAlarm();
+      sendStatusToPi();
+      Serial.println("✅ Person detected - Triggering alarm");
+    }
+    
+    // Clear detection on falling edge
+    if (!new_person_detected && person_detected) {
+      person_detected = false;
+      // Ensure alarm is stopped (clean state)
+      if (alarmActive) {
+        alarmActive = false;
+        noTone(BUZZER_PIN);
+        digitalWrite(LED_PIN, LOW);
+      }
+      Serial.println("✅ Area clear - Person left");
+      sendStatusToPi();
+    }
+    
+    // Run alarm system
+    runAlarmSystem();
+  } else {
+    // Credits == 0 - LiDAR safety disabled
+    // Force clear any existing detection and stop alarm
+    if (person_detected || alarmActive) {
+      person_detected = false;
       alarmActive = false;
       noTone(BUZZER_PIN);
       digitalWrite(LED_PIN, LOW);
+      sendStatusToPi();
+      Serial.println("# LiDAR safety disabled (credits == 0) - Detection cleared");
     }
-    Serial.println("✅ Area clear - Person left");
-    sendStatusToPi();
   }
-  
-  // Run alarm system
-  runAlarmSystem();
   
   // Send status to Pi every second
   if (now - lastStatusReport >= statusInterval) {
