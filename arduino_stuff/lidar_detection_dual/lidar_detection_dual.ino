@@ -261,6 +261,12 @@ void loop() {
 }
 
 void triggerAlarm() {
+  // CRITICAL: Only trigger alarm if credits > 0
+  if (credits == 0) {
+    Serial.println("# Alarm trigger blocked (credits == 0)");
+    return;  // Don't trigger alarm
+  }
+  
   alarmActive = true;
   alarmStartTime = millis();
   
@@ -271,7 +277,19 @@ void triggerAlarm() {
 }
 
 void runAlarmSystem() {
-  // Run siren for 5 seconds
+  // CRITICAL: Only run alarm if credits > 0
+  // If credits == 0, immediately stop any active alarm
+  if (credits == 0) {
+    if (alarmActive) {
+      alarmActive = false;
+      noTone(BUZZER_PIN);
+      digitalWrite(LED_PIN, LOW);
+      Serial.println("# Alarm stopped (credits == 0)");
+    }
+    return;  // Exit early - don't run alarm system
+  }
+  
+  // Run siren for 5 seconds (only if credits > 0)
   if (alarmActive) {
     unsigned long elapsed = millis() - alarmStartTime;
     if (elapsed < alarmDuration) {
