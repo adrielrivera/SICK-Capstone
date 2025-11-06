@@ -13,7 +13,9 @@ const int BUZZER_PIN = 9;           // Piezo buzzer
 const int LED_PIN = 13;             // Status LED
 
 // OR gate detection threshold (analog)
-const int OR_GATE_THRESHOLD = 400;  // ~2V - 5V signals are strong, easy to detect
+// Changed to 3V threshold to ignore 2.5V idle level
+// 3.0V * 1023 / 5.0V = 614 ADC counts
+const int OR_GATE_THRESHOLD = 610;  // ~3V - Only accept 3V+ as HIGH (ignores 2.5V idle)
 const unsigned long OR_GATE_CONFIRMATION_MS = 10;  // Fast confirmation for strong signals
 
 // TiM240 detection (digital from Pi GPIO)
@@ -87,7 +89,8 @@ void setup() {
   Serial.print(OR_GATE_THRESHOLD);
   Serial.print(" ADC (");
   Serial.print((OR_GATE_THRESHOLD * 5.0 / 1023.0), 2);
-  Serial.print("V), Confirmation: ");
+  Serial.print("V) - Only accepts 3V+ as HIGH (ignores 2.5V idle)");
+  Serial.print(", Confirmation: ");
   Serial.print(OR_GATE_CONFIRMATION_MS);
   Serial.println(" ms");
   Serial.println("# Input 2: Digital Pin 3 - TiM240 from Pi GPIO (3.3V HIGH when detected)");
