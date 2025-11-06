@@ -45,6 +45,7 @@ volatile bool creditAddPending = false;  // Flag set by interrupt, processed in 
 volatile unsigned long creditAddInterruptTime = 0;  // Timestamp when interrupt fired
 unsigned long lastCreditAddProcessedMs = 0;  // Last time credit was actually added
 const unsigned long CREDIT_ADD_DEBOUNCE_MS = 1000;  // Debounce time (1000ms = max 1 credit/second)
+const unsigned long CREDIT_ADD_MIN_LOW_MS = 20;  // Minimum time pin must stay LOW to be valid (filters noise)
 
 // Serial communication with Pi
 String serialCommand = "";
@@ -119,19 +120,46 @@ void loop() {
   // Handle serial commands from Pi
   handleSerialCommands();
   
-  // Process pending credit add from interrupt (with debouncing)
+  // Process pending credit add from interrupt (with debouncing and noise filtering)
   if (creditAddPending) {
-    // Check debounce: only process if enough time has passed since last credit add
-    if (now - lastCreditAddProcessedMs >= CREDIT_ADD_DEBOUNCE_MS) {
-      // Process the credit add
-      credits++;
-      lastCreditAddProcessedMs = now;
-      
-      sendCreditStatus();
-      Serial.println("# Credit added via hardware signal (Pin 2 falling edge)");
+    // CRITICAL: Verify the pin is actually LOW and stays LOW for minimum duration
+    // This filters out brief noise spikes that cause false falling edges
+    unsigned long interruptTime = creditAddInterruptTime;
+    unsigned long timeSinceInterrupt = now - interruptTime;
+    
+    // Check current pin state
+    int currentPinState = digitalRead(CREDIT_ADD_PIN);
+    
+    if (currentPinState == HIGH) {
+      // Pin is HIGH - was just a brief noise spike, ignore
+      // This filters out very brief LOW pulses that don't last long enough
+      creditAddPending = false;
+    } else if (currentPinState == LOW) {
+      // Pin is LOW - check if it's been LOW long enough to be valid
+      if (timeSinceInterrupt >= CREDIT_ADD_MIN_LOW_MS) {
+        // Pin has been LOW for minimum duration - this is a valid signal
+        // Now check debounce (time since last credit add)
+        if (now - lastCreditAddProcessedMs >= CREDIT_ADD_DEBOUNCE_MS) {
+          // Double-check pin is still LOW (one more verification)
+          if (digitalRead(CREDIT_ADD_PIN) == LOW) {
+            // Process the credit add - this is a confirmed valid signal
+            credits++;
+            lastCreditAddProcessedMs = now;
+            
+            sendCreditStatus();
+            Serial.println("# Credit added via hardware signal (Pin 2 falling edge)");
+          }
+          // Clear flag after processing (whether successful or not)
+          creditAddPending = false;
+        } else {
+          // Debounce active - ignore this trigger
+          // Clear flag to prevent spamming
+          creditAddPending = false;
+        }
+      }
+      // If not enough time has passed, keep flag set and check again next iteration
+      // This allows the pin to stabilize before we decide if it's valid
     }
-    // Clear the flag regardless (debounce prevents multiple triggers)
-    creditAddPending = false;
   }
   
   // ============================================================
