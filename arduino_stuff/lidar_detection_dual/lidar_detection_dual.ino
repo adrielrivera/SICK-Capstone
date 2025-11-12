@@ -20,7 +20,8 @@ const unsigned long OR_GATE_CONFIRMATION_MS = 10;  // Fast confirmation for stro
 
 // TiM240 detection (digital from Pi GPIO)
 // Pi GPIO outputs 3.3V HIGH when TiM240 detects person
-const unsigned long TIM240_CONFIRMATION_MS = 50;  // Confirmation time for digital signal
+// Uses confirmation time for both HIGH and LOW states to prevent false triggers/clears
+const unsigned long TIM240_CONFIRMATION_MS = 50;  // Confirmation time for both HIGH and LOW states
 
 // Detection state
 bool person_detected = false;
@@ -33,6 +34,7 @@ const unsigned long alarmDuration = 5000; // 5 seconds
 // Time-based confirmation for each input
 unsigned long or_gate_detectionStartTime = 0;
 unsigned long tim240_detectionStartTime = 0;
+unsigned long tim240_clearStartTime = 0;  // Timer for confirming LOW state
 
 // Input state tracking
 bool or_gate_detected = false;
@@ -74,6 +76,7 @@ void setup() {
   // Initialize detection timers
   or_gate_detectionStartTime = 0;
   tim240_detectionStartTime = 0;
+  tim240_clearStartTime = 0;
   
   // Initialize credit system
   creditAddPending = false;
@@ -193,17 +196,30 @@ void loop() {
   bool tim240_high = (tim240_level == HIGH);
   
   if (tim240_high) {
-    // TiM240 signal detected
+    // TiM240 signal detected - start confirmation timer
     if (tim240_detectionStartTime == 0) {
       tim240_detectionStartTime = now;
     } else if ((now - tim240_detectionStartTime) >= TIM240_CONFIRMATION_MS) {
       // Confirmed: stable HIGH signal
       tim240_detected = true;
+      // Reset clear timer since we're detecting
+      tim240_clearStartTime = 0;
     }
   } else {
-    // TiM240 signal low - reset timer
-    tim240_detectionStartTime = 0;
-    tim240_detected = false;
+    // TiM240 signal low - start clear confirmation timer
+    if (tim240_clearStartTime == 0) {
+      tim240_clearStartTime = now;
+    } else if ((now - tim240_clearStartTime) >= TIM240_CONFIRMATION_MS) {
+      // Confirmed: stable LOW signal - clear detection
+      tim240_detected = false;
+      // Reset detection timer since we're clear
+      tim240_detectionStartTime = 0;
+    }
+    // If we were detecting but signal went LOW, reset detection timer
+    // (but don't clear detection until confirmed LOW for 50ms)
+    if (tim240_detectionStartTime > 0) {
+      tim240_detectionStartTime = 0;
+    }
   }
   
   // ============================================================
