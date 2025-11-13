@@ -6,12 +6,12 @@ import RPi.GPIO as GPIO
 import time
 import sys
 
-GPIO_PIN = 18  # GPIO18 (Physical Pin 12)
+GPIO_PIN = 17  # GPIO17 (Physical Pin 11) - Changed from GPIO 18
 
 print("=" * 60)
-print("GPIO 18 Test Script")
+print("GPIO 17 Test Script")
 print("=" * 60)
-print(f"Target: GPIO {GPIO_PIN} (BCM) = Physical Pin 12")
+print(f"Target: GPIO {GPIO_PIN} (BCM) = Physical Pin 11")
 print()
 
 try:

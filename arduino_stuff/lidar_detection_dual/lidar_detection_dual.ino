@@ -1,7 +1,7 @@
 // LiDAR Detection System - Dual Input Arduino + Credit Tracking
 // Input 1: OR gate from side LiDARs (TiM100/TiM150) - Analog Pin A0 (5V signal)
 // Input 2: TiM240 from Pi GPIO - Digital Pin 3 (3.3V signal)
-// Credit Add: Pi GPIO 18 → Digital Pin 2 (falling edge 3.3V→0V)
+// Credit Add: Pi GPIO 18 → Digital Pin 2 (falling edge 3.3V→0V) - Note: TiM240 uses GPIO 17
 // Activates alarm circuit when ANY LiDAR detects a person
 // Tracks credits: 2 PBT hits = 1 credit deducted
 // Sends status back to Pi for webapp display
@@ -101,6 +101,7 @@ void setup() {
   Serial.print(TIM240_CONFIRMATION_MS);
   Serial.println(" ms");
   Serial.println("# Credit Add: Digital Pin 2 - Pi GPIO 18 (falling edge 3.3V→0V triggers +1 credit)");
+  Serial.println("# Note: TiM240 detection uses Pi GPIO 17 (Physical Pin 11)");
   Serial.println("# Credit System: Pi tracks hits (2 hits = 1 credit), sends DEDUCT_CREDIT when needed");
   Serial.println("# LiDAR Safety: DISABLED when credits == 0 (no detection, no alarm)");
   Serial.println("# Alarm: Buzzer Pin 9, LED Pin 13");
@@ -440,12 +441,12 @@ void handleCreditAdd() {
 //   - OR Gate outputs 5V when either side LiDAR detects
 //
 // TiM240 Signal:
-//   - TiM240 → Pi GPIO 18 (Pin 12) → Arduino Digital Pin 3
+//   - TiM240 → Pi GPIO 17 (Physical Pin 11) → Arduino Digital Pin 3
 //   - Pi GPIO outputs 3.3V HIGH when TiM240 detects person
 //   - Arduino Pin 3: INPUT (no pull-up, Pi controls it)
 //
 // Credit Add Signal:
-//   - Pi GPIO 18 (Pin 12) → Arduino Digital Pin 2
+//   - Pi GPIO 18 (Physical Pin 12) → Arduino Digital Pin 2
 //   - Signal: Falling edge (3.3V HIGH → 0V LOW) triggers +1 credit
 //   - Arduino Pin 2: INPUT (no pull-up, Pi controls it)
 //

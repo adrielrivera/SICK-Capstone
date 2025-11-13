@@ -12,7 +12,7 @@ tim150_detected = False
 last_tim1xx_update = 0
 
 # GPIO pin for person detection output (3.3V)
-DETECTION_GPIO_PIN = 18  # GPIO18 (Pin 12)
+DETECTION_GPIO_PIN = 17  # GPIO17 (Physical Pin 11) - Changed from GPIO 18
 
 # --- Kite-shaped field detection system ---
 # No longer using the old single-point detector
