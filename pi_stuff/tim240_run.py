@@ -433,6 +433,13 @@ def main():
                     person_detected = (state == "ALERT_REAR")
                     if gpio_working:
                         GPIO.output(DETECTION_GPIO_PIN, GPIO.HIGH if person_detected else GPIO.LOW)
+                        # Debug: Print GPIO state changes
+                        if state != last_state:
+                            print(f"🔌 GPIO {DETECTION_GPIO_PIN} set to: {'HIGH (3.3V)' if person_detected else 'LOW (0V)'}")
+                    else:
+                        # Debug: Warn if GPIO not working
+                        if state != last_state and state == "ALERT_REAR":
+                            print(f"⚠️  WARNING: GPIO {DETECTION_GPIO_PIN} not working! State changed to ALERT_REAR but GPIO not updated.")
                     
                     if now_ms - last_print >= 2000:
                         print(f"{time.strftime('%H:%M:%S')}  state={state}  violations={len(violations)}  GPIO={'HIGH' if person_detected else 'LOW'}")
