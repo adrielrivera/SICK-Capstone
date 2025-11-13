@@ -216,7 +216,8 @@ def main():
                     violations = out.get("violations", [])
 
                     # Control GPIO based on person detection
-                    person_detected = (state == "ALERT_REAR" or state == "HAMMER_SUPPRESS")
+                    # HAMMER_SUPPRESS should NOT trigger GPIO HIGH - only ALERT_REAR should
+                    person_detected = (state == "ALERT_REAR")
                     GPIO.output(DETECTION_GPIO_PIN, GPIO.HIGH if person_detected else GPIO.LOW)
 
                     # Print status every 2 seconds or on state change
@@ -230,10 +231,15 @@ def main():
                         
                         # Enhanced output on state change
                         if state != last_state:
-                            if state == "ALERT_REAR" or state == "HAMMER_SUPPRESS":
-                                print(f"\n🚨 TiM240 DETECTED - GPIO 17 = HIGH")
+                            if state == "ALERT_REAR":
+                                print(f"\n🚨 TiM240 PERSON DETECTED - GPIO 17 = HIGH")
                                 print(f"   Time: {time.strftime('%H:%M:%S')}")
                                 print(f"   State: {state}")
+                                print(f"   Violations: {len(violations)}")
+                            elif state == "HAMMER_SUPPRESS":
+                                print(f"\n🔨 TiM240 HAMMER DETECTED - SUPPRESSED (GPIO 17 = LOW)")
+                                print(f"   Time: {time.strftime('%H:%M:%S')}")
+                                print(f"   State: {state} - No alarm triggered")
                                 print(f"   Violations: {len(violations)}")
                             elif state == "SAFE" and last_state in ["ALERT_REAR", "HAMMER_SUPPRESS"]:
                                 print(f"\n✅ TiM240 CLEAR - GPIO 17 = LOW")

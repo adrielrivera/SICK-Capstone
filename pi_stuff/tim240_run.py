@@ -430,12 +430,16 @@ def main():
                     violations = out.get("violations", [])
                     
                     # Control GPIO based on person detection (only if GPIO is working)
+                    # HAMMER_SUPPRESS should NOT trigger GPIO HIGH - only ALERT_REAR should
                     person_detected = (state == "ALERT_REAR")
                     if gpio_working:
                         GPIO.output(DETECTION_GPIO_PIN, GPIO.HIGH if person_detected else GPIO.LOW)
                         # Debug: Print GPIO state changes
                         if state != last_state:
-                            print(f"🔌 GPIO {DETECTION_GPIO_PIN} set to: {'HIGH (3.3V)' if person_detected else 'LOW (0V)'}")
+                            if state == "HAMMER_SUPPRESS":
+                                print(f"🔌 GPIO {DETECTION_GPIO_PIN} set to: LOW (0V) - Hammer suppressed, no alarm")
+                            else:
+                                print(f"🔌 GPIO {DETECTION_GPIO_PIN} set to: {'HIGH (3.3V)' if person_detected else 'LOW (0V)'}")
                     else:
                         # Debug: Warn if GPIO not working
                         if state != last_state and state == "ALERT_REAR":
@@ -462,7 +466,17 @@ def main():
                                 for v in violations:
                                     print(f"   - {v['type']}: {v['angle']:.1f}° at {v['distance']:.3f}m (safe: {v['safe_distance']:.3f}m)")
                             print(f"🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨🚨\n")
-                        elif state == "SAFE" and last_state == "ALERT_REAR":
+                        elif state == "HAMMER_SUPPRESS":
+                            print(f"\n🔨 ===== TiM240 HAMMER DETECTED - SUPPRESSED (NO ALARM) =====")
+                            print(f"   Time: {time.strftime('%H:%M:%S')}")
+                            print(f"   Sensor: TiM240 (Rear)")
+                            print(f"   Status: Hammer detected within 200cm - Alarm suppressed")
+                            print(f"   Violations: {len(violations)}")
+                            if violations:
+                                for v in violations:
+                                    print(f"   - {v['type']}: {v['angle']:.1f}° at {v['distance']:.3f}m (safe: {v['safe_distance']:.3f}m)")
+                            print(f"🔨🔨🔨🔨🔨🔨🔨🔨🔨🔨🔨🔨🔨🔨🔨🔨🔨🔨🔨🔨\n")
+                        elif state == "SAFE" and last_state in ["ALERT_REAR", "HAMMER_SUPPRESS"]:
                             print(f"\n✅ ===== TiM240 AREA CLEAR - REAR SIDE =====")
                             print(f"   Time: {time.strftime('%H:%M:%S')}")
                             print(f"   Sensor: TiM240 (Rear)")
