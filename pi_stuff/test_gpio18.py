@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Quick test script to verify GPIO 18 output works
+Quick test script to verify GPIO 17 output works (changed from GPIO 18)
 """
 import RPi.GPIO as GPIO
 import time
@@ -66,7 +66,7 @@ try:
     if high_state == GPIO.HIGH and low_state == GPIO.LOW:
         print("✅ GPIO test PASSED - GPIO responds correctly")
         print("   If oscilloscope shows no change, check:")
-        print("   1. Physical connection to GPIO 18 (Pin 12)")
+        print("   1. Physical connection to GPIO 17 (Pin 11)")
         print("   2. Ground connection")
         print("   3. Oscilloscope probe settings")
     else:

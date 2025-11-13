@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Simplified TiM240 GPIO Test
-Tests if TiM240 correctly outputs detection signal to GPIO 18 (Pin 12)
-No Arduino required - only tests TiM240 -> Pi -> GPIO 18
+Tests if TiM240 correctly outputs detection signal to GPIO 17 (Pin 11)
+No Arduino required - only tests TiM240 -> Pi -> GPIO 17
 """
 import socket
 import time
@@ -10,7 +10,7 @@ import math
 import RPi.GPIO as GPIO
 
 # GPIO pin for person detection output (3.3V)
-DETECTION_GPIO_PIN = 18  # GPIO18 (Physical Pin 12)
+DETECTION_GPIO_PIN = 17  # GPIO17 (Physical Pin 11) - Changed from GPIO 18
 
 # LiDAR connection
 HOST, PORT = "192.168.0.20", 2111
@@ -145,7 +145,7 @@ def main():
         GPIO.output(DETECTION_GPIO_PIN, GPIO.LOW)  # Start with no detection
         gpio_working = True
         print("✅ GPIO initialized successfully")
-        print(f"   GPIO Pin: {DETECTION_GPIO_PIN} (Physical Pin 12)")
+        print(f"   GPIO Pin: {DETECTION_GPIO_PIN} (Physical Pin 11)")
     except RuntimeError as e:
         print(f"⚠️  GPIO initialization failed: {e}")
         print("   Try running with: sudo python3 tim240_gpio_test.py")
@@ -157,7 +157,7 @@ def main():
 
     # Connect to LiDAR
     print(f"\n{'='*60}")
-    print("TiM240 GPIO Test - Detection Output to GPIO 18 (Pin 12)")
+    print("TiM240 GPIO Test - Detection Output to GPIO 17 (Pin 11)")
     print(f"{'='*60}")
     print(f"Connecting to TiM240 at {HOST}:{PORT}")
     
@@ -185,8 +185,8 @@ def main():
 
     print("\n" + "="*60)
     print("Monitoring TiM240 detection...")
-    print("  GPIO 18 will be HIGH when person detected")
-    print("  GPIO 18 will be LOW when area is clear")
+    print("  GPIO 17 will be HIGH when person detected")
+    print("  GPIO 17 will be LOW when area is clear")
     print("  Press Ctrl+C to stop")
     print("="*60 + "\n")
 
@@ -231,12 +231,12 @@ def main():
                         # Enhanced output on state change
                         if state != last_state:
                             if state == "ALERT_REAR" or state == "HAMMER_SUPPRESS":
-                                print(f"\n🚨 TiM240 DETECTED - GPIO 18 = HIGH")
+                                print(f"\n🚨 TiM240 DETECTED - GPIO 17 = HIGH")
                                 print(f"   Time: {time.strftime('%H:%M:%S')}")
                                 print(f"   State: {state}")
                                 print(f"   Violations: {len(violations)}")
                             elif state == "SAFE" and last_state in ["ALERT_REAR", "HAMMER_SUPPRESS"]:
-                                print(f"\n✅ TiM240 CLEAR - GPIO 18 = LOW")
+                                print(f"\n✅ TiM240 CLEAR - GPIO 17 = LOW")
                                 print(f"   Time: {time.strftime('%H:%M:%S')}")
                         
                         last_state = state
