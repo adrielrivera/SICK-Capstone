@@ -69,7 +69,7 @@ TEST_THRESHOLDS = dict(
     KITE_MAX_ANGLE=20.0715,
     KITE_MAX_DISTANCE=212.932,
     KITE_CENTER_DISTANCE=250.0,
-    HAMMER_MAX_DISTANCE=100.0,
+    HAMMER_MAX_DISTANCE=200.0,
     # Dwell short so your hand movement is responsive
     DWELL_MS=100,
     MIN_POINTS_IN_ROI=1,   # Minimum points in kite field
@@ -98,7 +98,7 @@ def send(sock, cmd, expect_reply=True, timeout=2.0):
 KITE_MAX_ANGLE = 20.0715  # degrees
 KITE_MAX_DISTANCE = 212.932  # cm at max angle (shadow distance on floor)
 KITE_CENTER_DISTANCE = 250.0  # cm at 0 degrees (shadow distance on floor)
-HAMMER_MAX_DISTANCE = 100.0  # cm - anything closer is considered hammer
+HAMMER_MAX_DISTANCE = 200.0  # cm - anything closer is considered hammer
 LIDAR_HEIGHT = 280.0  # cm above arcade base
 LIDAR_DOWN_ANGLE = 41.8  # degrees from vertical
 
