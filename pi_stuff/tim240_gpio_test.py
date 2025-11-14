@@ -18,8 +18,8 @@ STX, ETX = b"\x02", b"\x03"
 
 # Kite-shaped detection field parameters
 KITE_MAX_ANGLE = 20.0715  # degrees
-KITE_MAX_DISTANCE = 212.932  # cm at max angle (shadow distance on floor)
-KITE_CENTER_DISTANCE = 250.0  # cm at 0 degrees (shadow distance on floor)
+KITE_MAX_DISTANCE = 242.932  # cm at max angle (shadow distance on floor) - Increased from 212.932 (added 30cm)
+KITE_CENTER_DISTANCE = 280.0  # cm at 0 degrees (shadow distance on floor) - Increased from 250.0 (added 30cm)
 HAMMER_MAX_DISTANCE = 200.0  # cm - anything closer is considered hammer
 LIDAR_HEIGHT = 280.0  # cm above arcade base
 LIDAR_DOWN_ANGLE = 41.8  # degrees from vertical
