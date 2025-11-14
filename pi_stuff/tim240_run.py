@@ -67,8 +67,8 @@ def analyze_kite_field(points):
 TEST_THRESHOLDS = dict(
     # Kite field parameters
     KITE_MAX_ANGLE=20.0715,
-    KITE_MAX_DISTANCE=342.932,  # Increased from 242.932 (added 100cm for more leniency - floor detection)
-    KITE_CENTER_DISTANCE=380.0,  # Increased from 280.0 (added 100cm for more leniency - floor detection)
+    KITE_MAX_DISTANCE=180.0,  # Decreased from 242.932 (reduced to prevent floor detection - more lenient)
+    KITE_CENTER_DISTANCE=200.0,  # Decreased from 280.0 (reduced to prevent floor detection - more lenient)
     HAMMER_MAX_DISTANCE=200.0,
     # Dwell short so your hand movement is responsive
     DWELL_MS=100,
@@ -96,8 +96,8 @@ def send(sock, cmd, expect_reply=True, timeout=2.0):
 
 # ---- Kite-shaped detection field parameters ----
 KITE_MAX_ANGLE = 20.0715  # degrees
-KITE_MAX_DISTANCE = 342.932  # cm at max angle (shadow distance on floor) - Increased from 242.932 (added 100cm for floor detection)
-KITE_CENTER_DISTANCE = 380.0  # cm at 0 degrees (shadow distance on floor) - Increased from 280.0 (added 100cm for floor detection)
+KITE_MAX_DISTANCE = 180.0  # cm at max angle (shadow distance on floor) - Decreased to prevent floor detection (more lenient)
+KITE_CENTER_DISTANCE = 200.0  # cm at 0 degrees (shadow distance on floor) - Decreased to prevent floor detection (more lenient)
 HAMMER_MAX_DISTANCE = 200.0  # cm - anything closer is considered hammer
 LIDAR_HEIGHT = 280.0  # cm above arcade base
 LIDAR_DOWN_ANGLE = 41.8  # degrees from vertical
@@ -111,7 +111,7 @@ def calculate_kite_safe_distance(angle_deg):
     angle_deg = max(-KITE_MAX_ANGLE, min(KITE_MAX_ANGLE, angle_deg))
     
     # Linear interpolation between center and edge for shadow distances
-    # At 0°: 380cm, At ±20.0715°: 342.932cm (increased significantly to prevent floor detection)
+    # At 0°: 200cm, At ±20.0715°: 180cm (decreased to prevent floor detection - more lenient)
     ratio = abs(angle_deg) / KITE_MAX_ANGLE
     shadow_distance_cm = KITE_CENTER_DISTANCE - (KITE_CENTER_DISTANCE - KITE_MAX_DISTANCE) * ratio
     
