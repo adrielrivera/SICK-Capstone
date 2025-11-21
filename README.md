@@ -1,7 +1,3 @@
-# SICK7 - PBT Sensor Safety System
-
-A complete safety monitoring system for a PBT (Photo Beam Transmitter) sensor-based arcade game with LiDAR-based person detection and credit tracking.
-
 ## System Overview
 
 The system consists of:
@@ -18,7 +14,7 @@ The system consists of:
 - **PBT Sensor**: Connected to Analog Pin A0
 - **Arcade GPIO Pin 6**: Arduino Digital Pin 6 (Press START)
 - **Arcade GPIO Pin 5**: Arduino Digital Pin 5 (Press ACTIVE)
-- **Credit Add Signal**: Pi GPIO → Arduino Digital Pin 2 (falling edge interrupt)
+- **Credit Add Signal**: Arduino Digital Pin 2 (falling edge interrupt)
 - **Status LED**: Pin 13
 
 #### LiDAR Arduino (Port: `/dev/ttyUSB1`)
@@ -54,13 +50,13 @@ pip3 install Flask==3.0.0 Flask-SocketIO==5.3.5 pyserial==3.5
 
 #### PBT Arduino (`/dev/ttyUSB0`)
 ```bash
-cd ../SICK-Capstone/SICK-Capstone/arduino_stuff/pbt_with_credits
+cd ../SICK-Capstone/arduino_stuff/pbt_with_credits
 arduino-cli upload -p /dev/ttyUSB0 --fqbn arduino:avr:uno pbt_with_credits.ino
 ```
 
 #### LiDAR Arduino (`/dev/ttyUSB1`)
 ```bash
-cd ../SICK-Capstone/SICK-Capstone/arduino_stuff/lidar_detection_dual
+cd ../SICK-Capstone/arduino_stuff/lidar_detection_dual
 arduino-cli upload -p /dev/ttyUSB1 --fqbn arduino:avr:uno lidar_detection_dual.ino
 ```
 
@@ -77,7 +73,7 @@ LIDAR_SERIAL_PORT = "/dev/ttyUSB1"  # LiDAR Arduino
 ### 1. Start TiM240 LiDAR Processing (Terminal 1)
 
 ```bash
-cd SICK-Capstone/SICK-Capstone/pi_stuff
+cd SICK-Capstone/pi_stuff
 python3 tim240_gpio_test.py
 ```
 
@@ -91,7 +87,7 @@ This script:
 
 **With Credit Tracking:**
 ```bash
-cd SICK7/SICK-App
+cd SICK-App
 ./start_with_credits.sh
 ```
 
@@ -206,8 +202,7 @@ sudo chmod 666 /dev/ttyUSB1
 ## File Structure
 
 ```
-SICK7/
-├── README.md                    # This file
+
 ├── SICK-App/
 │   ├── app_with_credits.py      # Main webapp (with credit tracking)
 │   ├── app_combined.py          # Main webapp (without credits)
@@ -218,7 +213,7 @@ SICK7/
 │   ├── static/                  # Web assets (CSS, JS)
 │   └── templates/              # HTML templates
 │
-SICK-Capstone/
+
 └── SICK-Capstone/
     ├── arduino_stuff/
     │   ├── pbt_with_credits/    # PBT Arduino sketch
@@ -266,7 +261,7 @@ This project is part of a capstone project.
 
 ## Support
 
-For issues or questions, check:
+For issues, check:
 1. Serial console output from both Arduinos
 2. Python console output from webapp
 3. Browser console (F12) for webapp errors
